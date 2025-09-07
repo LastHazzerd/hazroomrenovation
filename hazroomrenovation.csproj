@@ -98,6 +98,9 @@
   <ItemGroup>
     <None Remove="source\Systems\RoomRegistry.cs~RF8637a84.TMP" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="resources\assets\hazroomrenovation\config\" />
+  </ItemGroup>
 
   <!-- Creating local settings file -->
   <Target Name="EnsureSettingsJson" BeforeTargets="ModInfo" Condition="!Exists('Properties\localSettings.props')">
