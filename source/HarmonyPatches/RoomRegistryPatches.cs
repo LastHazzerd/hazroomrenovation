@@ -17,6 +17,7 @@ using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
 // Have Harmony patch all vanilla methods that call/create instances of `Room` or `RoomRegistry` so that they are using `RenRoom` or `RenRoomRegistry` instead.
+// WARNING - The patch night not work correctly if you don't specify the full file path/namespace of the classes/methods you are trying to call since the vanilla file does not have a 'using' declaration identifying the mod.
 namespace hazroomrenovation.source.HarmonyPatches {
     [HarmonyPatch]
     public class RoomRegistryPatches {
@@ -284,12 +285,90 @@ namespace hazroomrenovation.source.HarmonyPatches {
             ///IL_0014: call      instance class [VSEssentials]Vintagestory.GameContent.Room [VSEssentials]Vintagestory.GameContent.RoomRegistry::GetRoomForPosition(class [VintagestoryAPI]
             ///IL_0014: call      instance class [VSEssentials]Vintagestory.GameContent.Room [VSEssentials]Vintagestory.GameContent.RenRoomRegistry::GetRoomForPosition(class [VintagestoryAPI]
             for (int i = 0; i < codes.Count; i++) {
-                foundRoomReg = true;
                 if (codes[i].opcode == OpCodes.Call && codes[i].operand is MethodInfo method1 && method1 == Original) {
+                    foundRoomReg = true;
                     codes[i] = new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(RenRoomRegistry), nameof(RenRoomRegistry.GetRoomForPosition), new[] { typeof(BlockPos) }));
                 }
                 else if (i + 1 >= codes.Count && foundRoomReg == false) {
                     Console.WriteLine("[HazMod WARNING] Could not find RoomRegistry reference in BlockEntityBerryBush's CheckGrow() method.");
+                }
+            }
+            return codes;
+        }
+
+        // -------------------------------------------
+
+        [HarmonyPatch(typeof(EntityBehaviorBodyTemperature), nameof(EntityBehaviorBodyTemperature.OnGameTick))] //EntityBehaviorBodyTemperature.OnGameTick() is a public method
+        [HarmonyTranspiler] // Patch to replace the 'Room' and 'RoomRegistry' references in EntityBehaviorBodyTemperature's OnGameTick() method.
+
+        public static IEnumerable<CodeInstruction> PatchEntityBehaviorBodyTemperatureOnGameTick(IEnumerable<CodeInstruction> instructions, ILGenerator generator) {
+            var codes = new List<CodeInstruction>(instructions);
+            var constructorToFind = AccessTools.Constructor(typeof(RoomRegistry));
+            var methodToFind = AccessTools.Method(typeof(RoomRegistry), nameof(RoomRegistry.GetRoomForPosition));
+            bool foundRoomReg = false;
+            bool foundRoom = false;
+
+            for (int i = 0; i < codes.Count; i++) {
+                if (codes[i].opcode == OpCodes.Callvirt && codes[i].operand is ConstructorInfo constructor1 && constructor1 == constructorToFind) {
+                    foundRoomReg = true;
+                    codes[i] = new CodeInstruction(OpCodes.Callvirt, AccessTools.Constructor(typeof(RenRoomRegistry)));
+                }
+                if (codes[i].opcode == OpCodes.Callvirt && codes[i].operand is MethodInfo method1 && method1 == methodToFind) {
+                    foundRoom = true;
+                    codes[i] = new CodeInstruction(OpCodes.Callvirt, AccessTools.Method(typeof(RenRoomRegistry), nameof(RenRoomRegistry.GetRoomForPosition)));
+                }
+                else if (i + 1 >= codes.Count && foundRoomReg == false || foundRoom == false) {
+                    Console.WriteLine("[HazMod WARNING] Could not find RoomRegistry or Room reference in EntityBehaviorBodyTemperature's OnGameTick() method.");
+                }
+            }
+            return codes;
+        }
+
+        // -------------------------------------------
+
+        [HarmonyPatch(typeof(ItemCheese), nameof(ItemCheese.OnTransitionNow))] //ItemCheese.OnTransitionNow() is a public method
+        [HarmonyTranspiler] // Patch to replace the 'Room' and 'RoomRegistry' references in ItemCheese's OnTransitionNow() method.
+
+        public static IEnumerable<CodeInstruction> PatchItemCheeseOnTransitionNow(IEnumerable<CodeInstruction> instructions, ILGenerator generator) {
+            var codes = new List<CodeInstruction>(instructions);
+            var constructorToFind = AccessTools.Constructor(typeof(RoomRegistry));
+            var methodToFind = AccessTools.Method(typeof(RoomRegistry), nameof(RoomRegistry.GetRoomForPosition));
+            bool foundRoomReg = false;
+            bool foundRoom = false;
+
+            for (int i = 0; i < codes.Count; i++) {
+                if (codes[i].opcode == OpCodes.Callvirt && codes[i].operand is ConstructorInfo constructor1 && constructor1 == constructorToFind) {
+                    foundRoomReg = true;
+                    codes[i] = new CodeInstruction(OpCodes.Callvirt, AccessTools.Constructor(typeof(RenRoomRegistry)));
+                }
+                if (codes[i].opcode == OpCodes.Callvirt && codes[i].operand is MethodInfo method1 && method1 == methodToFind) {
+                    foundRoom = true;
+                    codes[i] = new CodeInstruction(OpCodes.Callvirt, AccessTools.Method(typeof(RenRoomRegistry), nameof(RenRoomRegistry.GetRoomForPosition)));
+                }
+                else if (i + 1 >= codes.Count && foundRoomReg == false || foundRoom == false) {
+                    Console.WriteLine("[HazMod WARNING] Could not find RoomRegistry or Room reference in ItemCheese's OnTransitionNow() method.");
+                }
+            }
+            return codes;
+        }
+
+        // -------------------------------------------
+
+        [HarmonyPatch(typeof(FruitTreeRootBH), "getGreenhouseTempBonus")] //FruitTreeRootBH.getGreenhouseTempBonus() is a protected method
+        [HarmonyTranspiler] // Patch to replace the 'Room' and 'RoomRegistry' references in ItemCheese's OnTransitionNow() method.
+
+        public static IEnumerable<CodeInstruction> PatchFruitTreeRootBHgetGreenhouseTempBonus(IEnumerable<CodeInstruction> instructions, ILGenerator generator) {
+            var codes = new List<CodeInstruction>(instructions);
+            var methodToFind = AccessTools.Method(typeof(RoomRegistry), nameof(RoomRegistry.GetRoomForPosition));
+            bool foundRoom = false;
+
+            for (int i = 0; i < codes.Count; i++) {
+                if (codes[i].opcode == OpCodes.Callvirt && codes[i].operand is MethodInfo method1 && method1 == methodToFind) {
+                    foundRoom = true;
+                    codes[i] = new CodeInstruction(OpCodes.Callvirt, AccessTools.Method(typeof(RenRoomRegistry), nameof(RenRoomRegistry.GetRoomForPosition)));
+                }
+                else if (i + 1 >= codes.Count && foundRoom == false) {
+                    Console.WriteLine("[HazMod WARNING] Could not find RoomRegistry or Room reference in ItemCheese's OnTransitionNow() method.");
                 }
             }
             return codes;
