@@ -4,7 +4,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Server;
 
-namespace hazroomrenovation {
+namespace hazroomrenovation.source {
     public class HazRoomRenovationModSystem : ModSystem {
         /// <summary>
         /// An instance of the harmony patcher.
