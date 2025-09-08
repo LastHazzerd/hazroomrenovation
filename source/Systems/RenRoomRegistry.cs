@@ -119,10 +119,10 @@ namespace hazroomrenovation.source.Systems {
 
     /// <summary> A class that manages a list of Renovated Rooms to be looked up and/or deleted. (Subject to change for data retention.) 
     /// </summary>
-    public class ChunkRenRooms {
-        public List<RenRoom> Rooms = [];
+    public class ChunkRenRooms : ChunkRooms {
+        //public List<RenRoom> Rooms = [];
 
-        public object roomsLock = new();
+        //public object roomsLock = new();
         public void AddRoom(RenRoom room) {
             lock (roomsLock) {
                 Rooms.Add(room);
@@ -139,8 +139,8 @@ namespace hazroomrenovation.source.Systems {
     /// <summary> Inherits the vanilla RoomRegistry class, used to record a RenRoom's Fields and saves it to the Chunk list.
     /// </summary>
     public class RenRoomRegistry : RoomRegistry {
-        protected Dictionary<long, ChunkRenRooms> renroomsByChunkIndex = [];
-        protected object renroomsByChunkIndexLock = new();
+        //protected new Dictionary<long, ChunkRenRooms> roomsByChunkIndex = [];
+        //protected new object roomsByChunkIndexLock = new();
 
         const int chunksize = GlobalConstants.ChunkSize;
         int chunkMapSizeX;
@@ -222,9 +222,9 @@ namespace hazroomrenovation.source.Systems {
             var player = args.Caller.Player as IServerPlayer;
             BlockPos pos = player.Entity.Pos.XYZ.AsBlockPos;
             long index3d = MapUtil.Index3dL(pos.X / chunksize, pos.Y / chunksize, pos.Z / chunksize, chunkMapSizeX, chunkMapSizeZ);
-            ChunkRenRooms chunkrooms;
-            lock (renroomsByChunkIndexLock) {
-                renroomsByChunkIndex.TryGetValue(index3d, out chunkrooms);
+            ChunkRooms chunkrooms;
+            lock (roomsByChunkIndexLock) {
+                roomsByChunkIndex.TryGetValue(index3d, out chunkrooms);
             }
 
             if (chunkrooms == null || chunkrooms.Rooms.Count == 0) {
@@ -240,7 +240,7 @@ namespace hazroomrenovation.source.Systems {
                 }
             }
             else {
-                RenRoom room = chunkrooms.Rooms[rindex];
+                Room room = chunkrooms.Rooms[rindex];
 
                 if (args.Parsers[0].IsMissing) {
                     room = null;
@@ -292,9 +292,9 @@ namespace hazroomrenovation.source.Systems {
             var player = args.Caller.Player as IServerPlayer;
             BlockPos pos = player.Entity.Pos.XYZ.AsBlockPos;
             long index3d = MapUtil.Index3dL(pos.X / chunksize, pos.Y / chunksize, pos.Z / chunksize, chunkMapSizeX, chunkMapSizeZ);
-            ChunkRenRooms chunkrooms;
-            lock (renroomsByChunkIndexLock) {
-                renroomsByChunkIndex.TryGetValue(index3d, out chunkrooms);
+            ChunkRooms chunkrooms;
+            lock (roomsByChunkIndexLock) {
+                roomsByChunkIndex.TryGetValue(index3d, out chunkrooms);
             }
 
             if (chunkrooms == null || chunkrooms.Rooms.Count == 0) {
@@ -304,7 +304,7 @@ namespace hazroomrenovation.source.Systems {
 
             lock (chunkrooms.roomsLock) {
                 for (int i = 0; i < chunkrooms.Rooms.Count; i++) {
-                    RenRoom room = chunkrooms.Rooms[i];
+                    Room room = chunkrooms.Rooms[i];
                     int sizex = room.Location.X2 - room.Location.X1 + 1;
                     int sizey = room.Location.Y2 - room.Location.Y1 + 1;
                     int sizez = room.Location.Z2 - room.Location.Z1 + 1;
@@ -330,8 +330,8 @@ namespace hazroomrenovation.source.Systems {
             long index3d = MapUtil.Index3dL(chunkCoord.X, chunkCoord.Y, chunkCoord.Z, chunkMapSizeX, chunkMapSizeZ);
             Cuboidi cuboid;
             FastSetOfLongs set = [index3d];
-            lock (renroomsByChunkIndexLock) {
-                renroomsByChunkIndex.TryGetValue(index3d, out ChunkRenRooms chunkrooms);
+            lock (roomsByChunkIndexLock) {
+                roomsByChunkIndex.TryGetValue(index3d, out ChunkRooms chunkrooms);
                 if (chunkrooms != null) {
                     set.Add(index3d);
                     for (int i = 0; i < chunkrooms.Rooms.Count; i++) {
@@ -358,23 +358,23 @@ namespace hazroomrenovation.source.Systems {
                         }
                     }
                 }
-                foreach (long index in set) renroomsByChunkIndex.Remove(index);
+                foreach (long index in set) roomsByChunkIndex.Remove(index);
             }
         }
 
         public new RenRoom GetRoomForPosition(BlockPos pos) {
             long index3d = MapUtil.Index3dL(pos.X / chunksize, pos.Y / chunksize, pos.Z / chunksize, chunkMapSizeX, chunkMapSizeZ);
 
-            ChunkRenRooms chunkrooms;
-            RenRoom room;
+            ChunkRooms chunkrooms;
+            Room room;
 
-            lock (renroomsByChunkIndexLock) {
-                renroomsByChunkIndex.TryGetValue(index3d, out chunkrooms);
+            lock (roomsByChunkIndexLock) {
+                roomsByChunkIndex.TryGetValue(index3d, out chunkrooms);
             }
 
             if (chunkrooms != null) {
-                RenRoom firstEnclosedRoom = null;
-                RenRoom firstOpenedRoom = null;
+                Room firstEnclosedRoom = null;
+                Room firstOpenedRoom = null;
 
                 for (int i = 0; i < chunkrooms.Rooms.Count; i++) {
                     room = chunkrooms.Rooms[i];
@@ -388,26 +388,26 @@ namespace hazroomrenovation.source.Systems {
                     }
                 }
 
-                if (firstEnclosedRoom != null && firstEnclosedRoom.IsFullyLoaded(chunkrooms)) return firstEnclosedRoom;
-                if (firstOpenedRoom != null && firstOpenedRoom.IsFullyLoaded(chunkrooms)) return firstOpenedRoom;
+                if (firstEnclosedRoom != null && firstEnclosedRoom.IsFullyLoaded(chunkrooms)) return (RenRoom)firstEnclosedRoom;
+                if (firstOpenedRoom != null && firstOpenedRoom.IsFullyLoaded(chunkrooms)) return (RenRoom)firstOpenedRoom;
 
                 room = FindRoomForPosition(pos, chunkrooms);
                 chunkrooms.AddRoom(room);
 
-                return room;
+                return (RenRoom)room;
             }
 
 
 
-            ChunkRenRooms rooms = new();
+            ChunkRenRooms rooms = new(); //Creates a new list using chunkrenrooms rather than chunkrooms, we'll see if that's okay.
             room = FindRoomForPosition(pos, rooms);
             rooms.AddRoom(room);
 
-            lock (renroomsByChunkIndexLock) {
-                renroomsByChunkIndex[index3d] = rooms;
+            lock (roomsByChunkIndexLock) {
+                roomsByChunkIndex[index3d] = rooms;
             }
 
-            return room;
+            return (RenRoom)room;
         }
 
 
@@ -421,7 +421,7 @@ namespace hazroomrenovation.source.Systems {
         int iteration = 0;
 
 
-        private RenRoom FindRoomForPosition(BlockPos pos, ChunkRenRooms otherRooms) { // originally, 'otherRooms' goes unused, but it appears to exist for the purpose of quickly verifying if the position exists in the list of rooms.
+        private RenRoom FindRoomForPosition(BlockPos pos, ChunkRooms otherRooms) { // originally, 'otherRooms' goes unused, but it appears to exist for the purpose of quickly verifying if the position exists in the list of rooms.
             QueueOfInt bfsQueue = new();
 
             int halfSize = (ARRAYSIZE - 1) / 2;
@@ -430,7 +430,8 @@ namespace hazroomrenovation.source.Systems {
 
             int visitedIndex = (halfSize * ARRAYSIZE + halfSize) * ARRAYSIZE + halfSize; // [Original Dev note] Center node
             int iteration = ++this.iteration;
-            currentVisited[visitedIndex] = iteration;
+            currentVisited[visitedIndex] = iteration; 
+            //ISSUE - The moment the 'FindRoomForPosition' method is called by GetRoom method above, the 'currentVisted[visitedIndex]' becomes 'null'
 
             int coolingWallCount = 0;
             int nonCoolingWallCount = 0;

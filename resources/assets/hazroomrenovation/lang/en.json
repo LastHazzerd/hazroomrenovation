@@ -1,3 +1,5 @@
 {
-    "hello": "hello world!"
+  "hello": "hello world!",
+  "renroomreg": "RenRoomRegistry",
+  "renroom": "RenRoom"
 }

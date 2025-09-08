@@ -22,7 +22,7 @@ namespace hazroomrenovation.source.HarmonyPatches {
     [HarmonyPatch]
     public class RoomRegistryPatches {
 
-        #region RoomRegistry Field references
+        #region RoomRegistry.cs Field references
         [HarmonyPatch(typeof(InWorldContainer), nameof(InWorldContainer.Init))]
         [HarmonyTranspiler] // Patch to replace the 'RoomRegistry' references in InWorldContainer's Init() method.
         public static IEnumerable<CodeInstruction> PatchInWorldContainerInit(IEnumerable<CodeInstruction> instructions, ILGenerator generator) {
@@ -193,7 +193,7 @@ namespace hazroomrenovation.source.HarmonyPatches {
 
         // -------------------------------------------
 
-        #region In Method references
+        #region In Method RoomRegistry.cs references
         [HarmonyPatch(typeof(EntityBehaviorHunger), nameof(EntityBehaviorHunger.Initialize))]
         [HarmonyTranspiler] // Patch to replace the 'RoomRegistry' variable in EntityBehaviorHunger's Initialize() method.
         public static IEnumerable<CodeInstruction> PatchEntityBehaviorHungerInitialize(IEnumerable<CodeInstruction> instructions, ILGenerator generator) {
@@ -256,7 +256,6 @@ namespace hazroomrenovation.source.HarmonyPatches {
             var codes = new List<CodeInstruction>(instructions);
             bool foundRoomReg = false;
             MethodInfo Original = AccessTools.Method(typeof(RoomRegistry), nameof(RoomRegistry.GetRoomForPosition), new[] { typeof(BlockPos) });
-            MethodInfo Replacement = AccessTools.Method(typeof(RenRoomRegistry), nameof(RenRoomRegistry.GetRoomForPosition), new[] { typeof(BlockPos) });
             ///Replace the 'RoomRegistry' type for the 'roomreg' variable with 'RenRoomRegistry' in the call to the instance class. (at the time of writing, it's line IL_0014)
             ///IL_0014: call      instance class [VSEssentials]Vintagestory.GameContent.Room [VSEssentials]Vintagestory.GameContent.RoomRegistry::GetRoomForPosition(class [VintagestoryAPI]
             ///IL_0014: call      instance class [VSEssentials]Vintagestory.GameContent.Room [VSEssentials]Vintagestory.GameContent.RenRoomRegistry::GetRoomForPosition(class [VintagestoryAPI]
@@ -369,6 +368,138 @@ namespace hazroomrenovation.source.HarmonyPatches {
                 }
                 else if (i + 1 >= codes.Count && foundRoom == false) {
                     Console.WriteLine("[HazMod WARNING] Could not find RoomRegistry or Room reference in ItemCheese's OnTransitionNow() method.");
+                }
+            }
+            return codes;
+        }
+
+        // -------------------------------------------
+
+        [HarmonyPatch(typeof(BlockEntityFarmland), "Update")] //BlockEntityFarmland.Update() is a private method
+        [HarmonyTranspiler] // Patch to replace the 'Room' and 'RoomRegistry' references in ItemCheese's OnTransitionNow() method.
+
+        public static IEnumerable<CodeInstruction> PatchBlockEntityFarmlandUpdate(IEnumerable<CodeInstruction> instructions, ILGenerator generator) {
+            var codes = new List<CodeInstruction>(instructions);
+            bool foundRoomReg = false;
+            MethodInfo Original = AccessTools.Method(typeof(RoomRegistry), nameof(RoomRegistry.GetRoomForPosition), new[] { typeof(BlockPos) });
+
+            for (int i = 0; i < codes.Count; i++) {
+                if (codes[i].opcode == OpCodes.Call && codes[i].operand is MethodInfo method1 && method1 == Original) {
+                    foundRoomReg = true;
+                    codes[i] = new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(RenRoomRegistry), nameof(RenRoomRegistry.GetRoomForPosition), new[] { typeof(BlockPos) }));
+                }
+                else if (i + 1 >= codes.Count && foundRoomReg == false) {
+                    Console.WriteLine("[HazMod WARNING] Could not find RoomRegistry reference in BlockEntityFarmland's Update() method.");
+                }
+            }
+            return codes;
+        }
+
+        // -------------------------------------------
+
+        [HarmonyPatch(typeof(EntityBehaviorHunger), "SlowTick")] //EntityBehaviorHunger.SlowTick() is a private method
+        [HarmonyTranspiler] // Patch to replace the 'Room' and 'RoomRegistry' references in EntityBehaviorHunger's SlowTick() method.
+
+        public static IEnumerable<CodeInstruction> PatchEntityBehaviorHungerSlowTick(IEnumerable<CodeInstruction> instructions, ILGenerator generator) {
+            var codes = new List<CodeInstruction>(instructions);
+            var methodToFind = AccessTools.Method(typeof(RoomRegistry), nameof(RoomRegistry.GetRoomForPosition));
+            bool foundRoom = false;
+
+            for (int i = 0; i < codes.Count; i++) {
+                if (codes[i].opcode == OpCodes.Callvirt && codes[i].operand is MethodInfo method1 && method1 == methodToFind) {
+                    foundRoom = true;
+                    codes[i] = new CodeInstruction(OpCodes.Callvirt, AccessTools.Method(typeof(RenRoomRegistry), nameof(RenRoomRegistry.GetRoomForPosition)));
+                }
+                else if (i + 1 >= codes.Count && foundRoom == false) {
+                    Console.WriteLine("[HazMod WARNING] Could not find RoomRegistry or Room reference in EntityBehaviorHunger's SlowTick() method.");
+                }
+            }
+            return codes;
+        }
+
+        // -------------------------------------------
+
+        [HarmonyPatch(typeof(EntityParticleInsect), "playsound")] //EntityParticleInsect.playsound() is a private method
+        [HarmonyTranspiler] // Patch to replace the 'Room' and 'RoomRegistry' references in EntityParticleInsect's playsound() method.
+
+        public static IEnumerable<CodeInstruction> PatchEntityParticleInsectplaysound(IEnumerable<CodeInstruction> instructions, ILGenerator generator) {
+            var codes = new List<CodeInstruction>(instructions);
+            var methodToFind = AccessTools.Method(typeof(RoomRegistry), nameof(RoomRegistry.GetRoomForPosition));
+            bool foundRoom = false;
+
+            for (int i = 0; i < codes.Count; i++) {
+                if (codes[i].opcode == OpCodes.Callvirt && codes[i].operand is MethodInfo method1 && method1 == methodToFind) {
+                    foundRoom = true;
+                    codes[i] = new CodeInstruction(OpCodes.Callvirt, AccessTools.Method(typeof(RenRoomRegistry), nameof(RenRoomRegistry.GetRoomForPosition)));
+                }
+                else if (i + 1 >= codes.Count && foundRoom == false) {
+                    Console.WriteLine("[HazMod WARNING] Could not find RoomRegistry or Room reference in EntityParticleInsect's playsound() method.");
+                }
+            }
+            return codes;
+        }
+
+        // -------------------------------------------
+
+        [HarmonyPatch(typeof(InWorldContainer), nameof(InWorldContainer.GetPerishRate))] //InWorldContainer.GetPerishRate() is a public method
+        [HarmonyTranspiler] // Patch to replace the 'Room' and 'RoomRegistry' references in InWorldContainer's GetPerishRate() method.
+
+        public static IEnumerable<CodeInstruction> PatchInWorldContainerGetPerishRate(IEnumerable<CodeInstruction> instructions, ILGenerator generator) {
+            var codes = new List<CodeInstruction>(instructions);
+            var methodToFind = AccessTools.Method(typeof(RoomRegistry), nameof(RoomRegistry.GetRoomForPosition));
+            bool foundRoom = false;
+
+            for (int i = 0; i < codes.Count; i++) {
+                if (codes[i].opcode == OpCodes.Callvirt && codes[i].operand is MethodInfo method1 && method1 == methodToFind) {
+                    foundRoom = true;
+                    codes[i] = new CodeInstruction(OpCodes.Callvirt, AccessTools.Method(typeof(RenRoomRegistry), nameof(RenRoomRegistry.GetRoomForPosition)));
+                }
+                else if (i + 1 >= codes.Count && foundRoom == false) {
+                    Console.WriteLine("[HazMod WARNING] Could not find RoomRegistry or Room reference in InWorldContainer's GetPerishRate() method.");
+                }
+            }
+            return codes;
+        }
+
+        // -------------------------------------------
+
+        [HarmonyPatch(typeof(InWorldContainer), nameof(InWorldContainer.OnTick))] //InWorldContainer.OnTick() is a public method
+        [HarmonyTranspiler] // Patch to replace the 'Room' and 'RoomRegistry' references in InWorldContainer's OnTick() method.
+
+        public static IEnumerable<CodeInstruction> PatchInWorldContainerOnTick(IEnumerable<CodeInstruction> instructions, ILGenerator generator) {
+            var codes = new List<CodeInstruction>(instructions);
+            var methodToFind = AccessTools.Method(typeof(RoomRegistry), nameof(RoomRegistry.GetRoomForPosition));
+            bool foundRoom = false;
+
+            for (int i = 0; i < codes.Count; i++) {
+                if (codes[i].opcode == OpCodes.Callvirt && codes[i].operand is MethodInfo method1 && method1 == methodToFind) {
+                    foundRoom = true;
+                    codes[i] = new CodeInstruction(OpCodes.Callvirt, AccessTools.Method(typeof(RenRoomRegistry), nameof(RenRoomRegistry.GetRoomForPosition)));
+                }
+                else if (i + 1 >= codes.Count && foundRoom == false) {
+                    Console.WriteLine("[HazMod WARNING] Could not find RoomRegistry or Room reference in InWorldContainer's OnTick() method.");
+                }
+            }
+            return codes;
+        }
+
+        // -------------------------------------------
+
+        [HarmonyPatch(typeof(InWorldContainer), nameof(InWorldContainer.ReloadRoom))] //InWorldContainer.ReloadRoom() is a public method
+        [HarmonyTranspiler] // Patch to replace the 'Room' and 'RoomRegistry' references in InWorldContainer's ReloadRoom() method.
+
+        public static IEnumerable<CodeInstruction> PatchInWorldContainerReloadRoom(IEnumerable<CodeInstruction> instructions, ILGenerator generator) {
+            var codes = new List<CodeInstruction>(instructions);
+            var methodToFind = AccessTools.Method(typeof(RoomRegistry), nameof(RoomRegistry.GetRoomForPosition));
+            bool foundRoom = false;
+
+            for (int i = 0; i < codes.Count; i++) {
+                if (codes[i].opcode == OpCodes.Callvirt && codes[i].operand is MethodInfo method1 && method1 == methodToFind) {
+                    foundRoom = true;
+                    codes[i] = new CodeInstruction(OpCodes.Callvirt, AccessTools.Method(typeof(RenRoomRegistry), nameof(RenRoomRegistry.GetRoomForPosition)));
+                }
+                else if (i + 1 >= codes.Count && foundRoom == false) {
+                    Console.WriteLine("[HazMod WARNING] Could not find RoomRegistry or Room reference in InWorldContainer's ReloadRoom() method.");
                 }
             }
             return codes;

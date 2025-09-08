@@ -14,23 +14,23 @@ namespace hazroomrenovation.source {
         // Called on server and client
         // Useful for registering block/entity classes on both sides
         public override void Start(ICoreAPI api) {
-            Mod.Logger.Notification("Hello from template mod: " + api.Side);
-            //If the client and server run from the same instance, there's a chance that without this check the patches will exist twice.
-            if (!Harmony.HasAnyPatches(Mod.Info.ModID)) {
-                //Create our harmony patcher, using our mod ID as a unique ID.
-                patcher = new Harmony(Mod.Info.ModID);
-                //PatchCategory will look for any [HarmonyPatchCategory("vstutorial")] classes, and patch them. 
-                patcher.PatchCategory(Mod.Info.ModID);
-            }
-
+            Mod.Logger.Notification("Initializing Start method: " + Lang.Get("hazroomrenovation:hello"));
+            base.Start(api);
+            //TODO
         }
 
         public override void StartServerSide(ICoreServerAPI api) {
-            Mod.Logger.Notification("Hello from template mod server side: " + Lang.Get("hazroomrenovation:hello"));
+            Mod.Logger.Notification("Initializing StartServerSide method: " + Lang.Get("hazroomrenovation:hello"));
+            if (!Harmony.HasAnyPatches(Mod.Info.ModID)) {
+                patcher = new Harmony(Mod.Info.ModID);
+                patcher.PatchAll();
+                //Might need more percision as the mod scales up.
+            }
         }
 
         public override void StartClientSide(ICoreClientAPI api) {
-            Mod.Logger.Notification("Hello from template mod client side: " + Lang.Get("hazroomrenovation:hello"));
+            Mod.Logger.Notification("Initializing StartClientSide method: " + Lang.Get("hazroomrenovation:hello"));
+
         }
 
         /// <summary>
@@ -39,6 +39,7 @@ namespace hazroomrenovation.source {
         public override void Dispose() {
             //It's important to remove our patches when disposed, otherwise any worlds loaded after closing would still contain the patches even if the mod was disabled.
             patcher?.UnpatchAll(Mod.Info.ModID);
+            base.Dispose();
         }
 
     }
