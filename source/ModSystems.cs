@@ -3,6 +3,7 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Server;
+using Vintagestory.Client.NoObf;
 
 namespace hazroomrenovation.source {
     public class HazRoomRenovationModSystem : ModSystem {
@@ -21,6 +22,10 @@ namespace hazroomrenovation.source {
 
         public override void StartServerSide(ICoreServerAPI api) {
             Mod.Logger.Notification("Initializing StartServerSide method: " + Lang.Get("hazroomrenovation:hello"));
+            Harmony.DEBUG = true; // ACTIVATES HARMONY DEBUG, Turn off for full release builds.
+            if (Harmony.DEBUG == true) { 
+                Mod.Logger.Notification("HARMONY DEBUG IS ON");
+            }
             if (!Harmony.HasAnyPatches(Mod.Info.ModID)) {
                 patcher = new Harmony(Mod.Info.ModID);
                 patcher.PatchAll();

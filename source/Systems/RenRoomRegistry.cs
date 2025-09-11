@@ -1,4 +1,5 @@
-﻿using System;
+﻿using HarmonyLib;
+using System;
 using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -7,6 +8,7 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.GameContent;
+using static OpenTK.Graphics.OpenGL.GL;
 
 #nullable disable
 
@@ -16,36 +18,36 @@ namespace hazroomrenovation.source.Systems {
     /// </summary>
     public class RenRoom : Room {
 
-        #region Vanilla variables
-        /// <summary> The number of empty blocks found in the room's walls, floor, and ceiling. 
-        /// </summary>
-        public new int ExitCount;
-        /// <summary> The number of ciling blocks that are considered transparent enough to let sunlight through while still being insulated. 
-        /// </summary>
-        public new int SkylightCount;
-        /// <summary> The number of ciling blocks that do not let enough sunlight through to be considered a skylight. 
-        /// </summary>
-        public new int NonSkylightCount;
-        /// <summary> The number of wall blocks that are considered temperature retaining/insulating from outside heat. 
-        /// </summary>
-        public new int CoolingWallCount;
-        /// <summary> the number of wall blocks that are not considered temperature retaining/insulating from outside heat. 
-        /// </summary>
-        public new int NonCoolingWallCount;
+        //#region Vanilla variables
+        ///// <summary> The number of empty blocks found in the room's walls, floor, and ceiling. 
+        ///// </summary>
+        //public new int ExitCount;
+        ///// <summary> The number of ciling blocks that are considered transparent enough to let sunlight through while still being insulated. 
+        ///// </summary>
+        //public new int SkylightCount;
+        ///// <summary> The number of ciling blocks that do not let enough sunlight through to be considered a skylight. 
+        ///// </summary>
+        //public new int NonSkylightCount;
+        ///// <summary> The number of wall blocks that are considered temperature retaining/insulating from outside heat. 
+        ///// </summary>
+        //public new int CoolingWallCount;
+        ///// <summary> the number of wall blocks that are not considered temperature retaining/insulating from outside heat. 
+        ///// </summary>
+        //public new int NonCoolingWallCount;
 
-        /// <summary> If true, indicates room dimensions do not exceed recommended cellar dimensions of 7x7x7  (soft limit: slightly longer shapes with low overall volume also permitted) 
-        /// </summary>
-        public new bool IsSmallRoom;
+        ///// <summary> If true, indicates room dimensions do not exceed recommended cellar dimensions of 7x7x7  (soft limit: slightly longer shapes with low overall volume also permitted) 
+        ///// </summary>
+        //public new bool IsSmallRoom;
 
-        /// <summary> A bounding box of the found room volume, but that doesn't mean this volumne is 100% room. You can check if a block inside inside is volume is part of the room with the PosInRoom byte array 
-        /// </summary>
-        public new Cuboidi Location;
-        public new byte[] PosInRoom;
+        ///// <summary> A bounding box of the found room volume, but that doesn't mean this volumne is 100% room. You can check if a block inside inside is volume is part of the room with the PosInRoom byte array 
+        ///// </summary>
+        //public new Cuboidi Location;
+        //public new byte[] PosInRoom;
 
-        /// <summary> If greater than 0, a chunk is unloaded. Counts upwards and when it reaches a certain value, this room will be removed from the registry and re-checked: this allows valid fully loaded rooms to be detected quite quickly in the normal world loading process        /// The potential issue is a room with a container, on the very edge of the server's loaded world, with neighbouring chunks remaining unloaded for potentially a long time. This will never be loaded, so we don't want to recheck its status fully too often: not every tick, that would be too costly 
-        /// </summary>
-        public new int AnyChunkUnloaded;
-        #endregion
+        ///// <summary> If greater than 0, a chunk is unloaded. Counts upwards and when it reaches a certain value, this room will be removed from the registry and re-checked: this allows valid fully loaded rooms to be detected quite quickly in the normal world loading process        /// The potential issue is a room with a container, on the very edge of the server's loaded world, with neighbouring chunks remaining unloaded for potentially a long time. This will never be loaded, so we don't want to recheck its status fully too often: not every tick, that would be too costly 
+        ///// </summary>
+        //public new int AnyChunkUnloaded;
+        //#endregion
 
         #region modded numerical values
         /// <summary> number of blocks making up the walls/floor/ceiling can be considered heat retaining. 
@@ -76,9 +78,9 @@ namespace hazroomrenovation.source.Systems {
         /// </summary>
         public int WaterBlocks;
 
+        //TODO: need to figure out a good way of flexibly looking for specific blocktypes/entities for room requirements, such as beds, anvils, troughs, etc. Perhaps roomtype can be a JSON with its own definitions for room limits.
         //public int ForestCoverage; //a numerical value representing how much forest coverage is in the climate around the room. (Not sure if this is useful at the moment)
         //public int ShrubCoverage; //a numerical value representing how much shrubbery is in the climate around the room.
-        //TODO: need to figure out a good way of flexibly looking for specific blocktypes/entities for room requirements, such as beds, anvils, troughs, etc. Perhaps roomtype can be a JSON with its own definitions for room limits.
         #endregion
 
         #region room information strings
@@ -90,279 +92,70 @@ namespace hazroomrenovation.source.Systems {
 
         /// <summary> boolean check to verify if the room in question is fully loaded or if any number of chunks it is built on are currently unloaded. </summary>
         /// <param name="roomsList"></param>
-        public bool IsFullyLoaded(ChunkRenRooms roomsList) {
-            if (AnyChunkUnloaded == 0) return true;
+        //public bool IsFullyLoaded(ChunkRooms roomsList) {
+        //    if (AnyChunkUnloaded == 0) return true;
 
-            if (++AnyChunkUnloaded > 10) {
-                roomsList.RemoveRoom(this);
-            }
-            return false;
-        }
+        //    if (++AnyChunkUnloaded > 10) {
+        //        roomsList.RemoveRoom(this);
+        //    }
+        //    return false;
+        //}
 
         /// <summary> A boolean check to verify if the given position is located within the room. </summary>
         /// <param name="pos"></param>
-        public new bool Contains(BlockPos pos) {
-            if (!Location.ContainsOrTouches(pos)) return false;
+        //public new bool Contains(BlockPos pos) {
+        //    if (!Location.ContainsOrTouches(pos)) return false;
 
-            int sizez = Location.Z2 - Location.Z1 + 1;
-            int sizex = Location.X2 - Location.X1 + 1;
+        //    int sizez = Location.Z2 - Location.Z1 + 1;
+        //    int sizex = Location.X2 - Location.X1 + 1;
 
-            int dx = pos.X - Location.X1;
-            int dy = pos.Y - Location.Y1;
-            int dz = pos.Z - Location.Z1;
+        //    int dx = pos.X - Location.X1;
+        //    int dy = pos.Y - Location.Y1;
+        //    int dz = pos.Z - Location.Z1;
 
-            int index = (dy * sizez + dz) * sizex + dx;
+        //    int index = (dy * sizez + dz) * sizex + dx;
 
-            return (PosInRoom[index / 8] & 1 << index % 8) > 0;
-        }
+        //    return (PosInRoom[index / 8] & 1 << index % 8) > 0;
+        //}
     }
 
     /// <summary> A class that manages a list of Renovated Rooms to be looked up and/or deleted. (Subject to change for data retention.) 
     /// </summary>
-    public class ChunkRenRooms : ChunkRooms {
-        //public List<RenRoom> Rooms = [];
+    //public class ChunkRenRooms : ChunkRooms {
+    //    //public List<RenRoom> Rooms = [];
 
-        //public object roomsLock = new();
-        public void AddRoom(RenRoom room) {
-            lock (roomsLock) {
-                Rooms.Add(room);
-            }
-        }
-        public void RemoveRoom(RenRoom room) {
-            lock (roomsLock) {
-                Rooms.Remove(room);
-            }
-        }
+    //    //public object roomsLock = new();
+    //    public void AddRoom(RenRoom room) {
+    //        lock (roomsLock) {
+    //            Rooms.Add(room);
+    //        }
+    //    }
+    //    public void RemoveRoom(RenRoom room) {
+    //        lock (roomsLock) {
+    //            Rooms.Remove(room);
+    //        }
+    //    }
 
-    }
+    //}
 
     /// <summary> Inherits the vanilla RoomRegistry class, used to record a RenRoom's Fields and saves it to the Chunk list.
     /// </summary>
     public class RenRoomRegistry : RoomRegistry {
-        //protected new Dictionary<long, ChunkRenRooms> roomsByChunkIndex = [];
-        //protected new object roomsByChunkIndexLock = new();
-
         const int chunksize = GlobalConstants.ChunkSize;
-        int chunkMapSizeX;
-        int chunkMapSizeZ;
 
-        ICoreAPI api;
-
-        [ThreadStatic]
-        static ICachingBlockAccessor blockAccessor;   // [Original Dev note] We need a separate blockaccessor per thread, to prevent rare race conditions leading to crashes
-        ICachingBlockAccessor BlockAccess {
-            get {
-                if (blockAccessor != null) return blockAccessor;
-
-                blockAccessor = api.World.GetCachingBlockAccessor(false, false);
-                disposableBlockAccessors[Environment.CurrentManagedThreadId] = blockAccessor; //[Original Dev note] System.Threading.Thread.CurrentThread.ManagedThreadId
-                return blockAccessor;
-            }
-        }
-        // [Original Dev note] Looks a bit heavy, but we write to this only once per game per thread; then later we can ensure that we dispose of all the blockAccessors even if the thread itself is *not* disposed (ThreadPool threads for example are not disposed)
-        private System.Collections.Concurrent.ConcurrentDictionary<int, ICachingBlockAccessor> disposableBlockAccessors = new();
-
-        public override bool ShouldLoad(EnumAppSide forSide) {
-            return true;
-        }
-
-        public override void Start(ICoreAPI api) {
-            base.Start(api);
-            this.api = api;
-
-            api.Event.ChunkDirty += Event_ChunkDirty;
-        }
-        /// <summary> [Per the devs] Method that disposes the blockAccessor used by RoomRegistry to prevent memory leaks when the game exits. 
+        /// <summary>
+        /// The Room Renovation mod's modifed version of the original RoomRegistry's 'GetRoomForPosition' method.
         /// </summary>
-        public override void Dispose() {
-            // [Original Dev note] This entire method designed to prevent memory leaks when the game exits: no thread should retain a CachingBlockAccessor
-
-            blockAccessor?.Dispose();
-            blockAccessor = null;
-
-            foreach (var ba in disposableBlockAccessors.Values) {
-                ba?.Dispose();
-            }
-            disposableBlockAccessors.Clear();
-            disposableBlockAccessors = null;
-        }
-
-        public override void StartClientSide(ICoreClientAPI api) {
-            api.Event.BlockTexturesLoaded += Init;
-        }
-
-        public override void StartServerSide(ICoreServerAPI api) {
-            api.Event.SaveGameLoaded += Init;
-
-            api.ChatCommands.GetOrCreate("debug")
-                .BeginSubCommand("rooms")
-                    .RequiresPrivilege(Privilege.controlserver)
-
-                    .BeginSubCommand("list")
-                        .HandleWith(OnRoomRegDbgCmdList)
-                    .EndSubCommand()
-
-                    .BeginSubCommand("hi")
-                        .WithArgs(api.ChatCommands.Parsers.OptionalInt("rindex"))
-                        .RequiresPlayer()
-                        .HandleWith(OnRoomRegDbgCmdHi)
-                    .EndSubCommand()
-
-                    .BeginSubCommand("unhi")
-                        .RequiresPlayer()
-                        .HandleWith(OnRoomRegDbgCmdUnhi)
-                    .EndSubCommand()
-                .EndSubCommand()
-                ;
-        }
-        
-        #region Debug chat commands
-        private TextCommandResult OnRoomRegDbgCmdHi(TextCommandCallingArgs args) {
-            int rindex = (int)args.Parsers[0].GetValue();
-            var player = args.Caller.Player as IServerPlayer;
-            BlockPos pos = player.Entity.Pos.XYZ.AsBlockPos;
-            long index3d = MapUtil.Index3dL(pos.X / chunksize, pos.Y / chunksize, pos.Z / chunksize, chunkMapSizeX, chunkMapSizeZ);
-            ChunkRooms chunkrooms;
-            lock (roomsByChunkIndexLock) {
-                roomsByChunkIndex.TryGetValue(index3d, out chunkrooms);
-            }
-
-            if (chunkrooms == null || chunkrooms.Rooms.Count == 0) {
-                return TextCommandResult.Success("No rooms in this chunk");
-            }
-
-            if (chunkrooms.Rooms.Count - 1 < rindex || rindex < 0) {
-                if (rindex == 0) {
-                    return TextCommandResult.Success("No room at this index");
-                }
-                else {
-                    return TextCommandResult.Success("Wrong index, select a number between 0 and " + (chunkrooms.Rooms.Count - 1));
-                }
-            }
-            else {
-                Room room = chunkrooms.Rooms[rindex];
-
-                if (args.Parsers[0].IsMissing) {
-                    room = null;
-                    foreach (var croom in chunkrooms.Rooms) {
-                        if (croom.Contains(pos)) {
-                            room = croom;
-                            break;
-                        }
-                    }
-                    if (room == null) {
-                        return TextCommandResult.Success("No room at your location");
-                    }
-                }
-
-                // [Original Dev note] Debug visualization
-                List<BlockPos> poses = [];
-                List<int> colors = [];
-
-                int sizex = room.Location.X2 - room.Location.X1 + 1;
-                int sizey = room.Location.Y2 - room.Location.Y1 + 1;
-                int sizez = room.Location.Z2 - room.Location.Z1 + 1;
-
-                for (int dx = 0; dx < sizex; dx++) {
-                    for (int dy = 0; dy < sizey; dy++) {
-                        for (int dz = 0; dz < sizez; dz++) {
-                            int pindex = (dy * sizez + dz) * sizex + dx;
-
-                            if ((room.PosInRoom[pindex / 8] & 1 << pindex % 8) > 0) {
-                                poses.Add(new BlockPos(room.Location.X1 + dx, room.Location.Y1 + dy, room.Location.Z1 + dz));
-                                colors.Add(ColorUtil.ColorFromRgba(room.ExitCount == 0 ? 0 : 100, room.ExitCount == 0 ? 100 : 0, Math.Min(255, rindex * 30), 150));
-                            }
-                        }
-                    }
-                }
-
-                api.World.HighlightBlocks(player, 50, poses, colors);
-            }
-            return TextCommandResult.Success();
-        }
-
-        private TextCommandResult OnRoomRegDbgCmdUnhi(TextCommandCallingArgs args) {
-            var player = args.Caller.Player as IServerPlayer;
-            api.World.HighlightBlocks(player, 50, [], []);
-
-            return TextCommandResult.Success();
-        }
-
-        private TextCommandResult OnRoomRegDbgCmdList(TextCommandCallingArgs args) {
-            var player = args.Caller.Player as IServerPlayer;
-            BlockPos pos = player.Entity.Pos.XYZ.AsBlockPos;
-            long index3d = MapUtil.Index3dL(pos.X / chunksize, pos.Y / chunksize, pos.Z / chunksize, chunkMapSizeX, chunkMapSizeZ);
-            ChunkRooms chunkrooms;
-            lock (roomsByChunkIndexLock) {
-                roomsByChunkIndex.TryGetValue(index3d, out chunkrooms);
-            }
-
-            if (chunkrooms == null || chunkrooms.Rooms.Count == 0) {
-                return TextCommandResult.Success("No rooms here");
-            }
-            string response = chunkrooms.Rooms.Count + " Rooms here \n";
-
-            lock (chunkrooms.roomsLock) {
-                for (int i = 0; i < chunkrooms.Rooms.Count; i++) {
-                    Room room = chunkrooms.Rooms[i];
-                    int sizex = room.Location.X2 - room.Location.X1 + 1;
-                    int sizey = room.Location.Y2 - room.Location.Y1 + 1;
-                    int sizez = room.Location.Z2 - room.Location.Z1 + 1;
-                    response += string.Format("{0} - bbox dim: {1}/{2}/{3}, mid: {4}/{5}/{6}\n", i, sizex, sizey,
-                        sizez, room.Location.X1 + sizex / 2f, room.Location.Y1 + sizey / 2f,
-                        room.Location.Z1 + sizez / 2f);
-
-                }
-            }
-
-            return TextCommandResult.Success(response);
-        }
-        #endregion
-        
-
-        private void Init() {
-            chunkMapSizeX = api.World.BlockAccessor.MapSizeX / chunksize;
-            chunkMapSizeZ = api.World.BlockAccessor.MapSizeZ / chunksize;
-        }
-
-
-        private void Event_ChunkDirty(Vec3i chunkCoord, IWorldChunk chunk, EnumChunkDirtyReason reason) {
-            long index3d = MapUtil.Index3dL(chunkCoord.X, chunkCoord.Y, chunkCoord.Z, chunkMapSizeX, chunkMapSizeZ);
-            Cuboidi cuboid;
-            FastSetOfLongs set = [index3d];
-            lock (roomsByChunkIndexLock) {
-                roomsByChunkIndex.TryGetValue(index3d, out ChunkRooms chunkrooms);
-                if (chunkrooms != null) {
-                    set.Add(index3d);
-                    for (int i = 0; i < chunkrooms.Rooms.Count; i++) {
-                        cuboid = chunkrooms.Rooms[i].Location;
-                        int x1 = cuboid.Start.X / chunksize;
-                        int x2 = cuboid.End.X / chunksize;
-                        int y1 = cuboid.Start.Y / chunksize;
-                        int y2 = cuboid.End.Y / chunksize;
-                        int z1 = cuboid.Start.Z / chunksize;
-                        int z2 = cuboid.End.Z / chunksize;
-                        set.Add(MapUtil.Index3dL(x1, y1, z1, chunkMapSizeX, chunkMapSizeZ));
-                        if (z2 != z1) set.Add(MapUtil.Index3dL(x1, y1, z2, chunkMapSizeX, chunkMapSizeZ));
-                        if (y2 != y1) {
-                            set.Add(MapUtil.Index3dL(x1, y2, z1, chunkMapSizeX, chunkMapSizeZ));
-                            if (z2 != z1) set.Add(MapUtil.Index3dL(x1, y2, z2, chunkMapSizeX, chunkMapSizeZ));
-                        }
-                        if (x2 != x1) {
-                            set.Add(MapUtil.Index3dL(x2, y1, z1, chunkMapSizeX, chunkMapSizeZ));
-                            if (z2 != z1) set.Add(MapUtil.Index3dL(x2, y1, z2, chunkMapSizeX, chunkMapSizeZ));
-                            if (y2 != y1) {
-                                set.Add(MapUtil.Index3dL(x2, y2, z1, chunkMapSizeX, chunkMapSizeZ));
-                                if (z2 != z1) set.Add(MapUtil.Index3dL(x2, y2, z2, chunkMapSizeX, chunkMapSizeZ));
-                            }
-                        }
-                    }
-                }
-                foreach (long index in set) roomsByChunkIndex.Remove(index);
-            }
-        }
-
-        public new RenRoom GetRoomForPosition(BlockPos pos) {
+        /// <param name="pos"></param>
+        /// <param name="ogInst"></param>
+        /// <param name="chunksize"></param>
+        /// <param name="chunkMapSizeX"></param>
+        /// <param name="chunkMapSizeZ"></param>
+        /// <returns></returns>
+        public Room GetRenRoomForPosition(BlockPos pos, ICachingBlockAccessor blockAccess, ICoreAPI api, int chunkMapSizeX, int chunkMapSizeZ) { //, ICachingBlockAccessor blockAccess, ICoreAPI api) { //, int chunksize, int chunkMapSizeX, int chunkMapSizeZ, ICachingBlockAccessor blockAccess, ICoreAPI api) {            
+            //if (Harmony.DEBUG == true) { System.Diagnostics.Debug.WriteLine("RenRoomRegistry is running 'GetRoom' method."); }
+            
+            
             long index3d = MapUtil.Index3dL(pos.X / chunksize, pos.Y / chunksize, pos.Z / chunksize, chunkMapSizeX, chunkMapSizeZ);
 
             ChunkRooms chunkrooms;
@@ -388,30 +181,30 @@ namespace hazroomrenovation.source.Systems {
                     }
                 }
 
-                if (firstEnclosedRoom != null && firstEnclosedRoom.IsFullyLoaded(chunkrooms)) return (RenRoom)firstEnclosedRoom;
-                if (firstOpenedRoom != null && firstOpenedRoom.IsFullyLoaded(chunkrooms)) return (RenRoom)firstOpenedRoom;
+                if (firstEnclosedRoom != null && firstEnclosedRoom.IsFullyLoaded(chunkrooms)) return firstEnclosedRoom;
+                if (firstOpenedRoom != null && firstOpenedRoom.IsFullyLoaded(chunkrooms)) return firstOpenedRoom;
 
-                room = FindRoomForPosition(pos, chunkrooms);
+                room = FindRenRoomForPosition(pos, blockAccess, api);
                 chunkrooms.AddRoom(room);
 
-                return (RenRoom)room;
+                return room;
             }
 
-
-
-            ChunkRenRooms rooms = new(); //Creates a new list using chunkrenrooms rather than chunkrooms, we'll see if that's okay.
-            room = FindRoomForPosition(pos, rooms);
+            // Original code: ChunkRooms rooms = new ChunkRooms();
+            ChunkRooms rooms = new();
+            room = FindRenRoomForPosition(pos, blockAccess, api);
             rooms.AddRoom(room);
 
             lock (roomsByChunkIndexLock) {
                 roomsByChunkIndex[index3d] = rooms;
             }
 
-            return (RenRoom)room;
+            return room;
         }
 
-
-        const int ARRAYSIZE = 29;  // [Original Dev note] Note if this constant is increased beyond 32, the bitshifts for compressedPos in the bfsQueue.Enqueue() and .Dequeue() calls may need updating
+        #region constants for FindRoom
+        // These variables are direct copies of the original RoomRegistry, they are private, but i don't believe they require the original RoomRegistry's instance.
+        const int ARRAYSIZE = 29;  // Note if this constant is increased beyond 32, the bitshifts for compressedPos in the bfsQueue.Enqueue() and .Dequeue() calls may need updating
         readonly int[] currentVisited = new int[ARRAYSIZE * ARRAYSIZE * ARRAYSIZE];
         readonly int[] skyLightXZChecked = new int[ARRAYSIZE * ARRAYSIZE];
         const int MAXROOMSIZE = 14;
@@ -419,19 +212,27 @@ namespace hazroomrenovation.source.Systems {
         const int ALTMAXCELLARSIZE = 9;
         const int ALTMAXCELLARVOLUME = 150;
         int iteration = 0;
+        #endregion
 
-
-        private RenRoom FindRoomForPosition(BlockPos pos, ChunkRooms otherRooms) { // originally, 'otherRooms' goes unused, but it appears to exist for the purpose of quickly verifying if the position exists in the list of rooms.
+        /// <summary>
+        /// The Renovation mod's version of the original RoomRegistry's FindRoom method.
+        /// </summary>
+        /// <param name="pos"></param>
+        /// <param name="otherRooms"></param>
+        /// <returns></returns>
+        private RenRoom FindRenRoomForPosition(BlockPos pos, ICachingBlockAccessor blockAccess, ICoreAPI api) { //, ChunkRooms otherRooms, ICachingBlockAccessor blockAccess, ICoreAPI api) {
+            //because this method is called ONLY by the GetRoom method above, and that method is called via a harmony patch to the base class, I need to ensure the base class' instances of private params/fields get passed to these methods.
+            //if (Harmony.DEBUG == true) { System.Diagnostics.Debug.WriteLine("RenRoomRegistry is running 'FindRenRoom' method."); }
+            //Original Code: QueueOfInt bfsQueue = new QueueOfInt()
             QueueOfInt bfsQueue = new();
 
             int halfSize = (ARRAYSIZE - 1) / 2;
             int maxSize = halfSize + halfSize;
             bfsQueue.Enqueue(halfSize << 10 | halfSize << 5 | halfSize);
 
-            int visitedIndex = (halfSize * ARRAYSIZE + halfSize) * ARRAYSIZE + halfSize; // [Original Dev note] Center node
+            int visitedIndex = (halfSize * ARRAYSIZE + halfSize) * ARRAYSIZE + halfSize; // Center node
             int iteration = ++this.iteration;
-            currentVisited[visitedIndex] = iteration; 
-            //ISSUE - The moment the 'FindRoomForPosition' method is called by GetRoom method above, the 'currentVisted[visitedIndex]' becomes 'null'
+            currentVisited[visitedIndex] = iteration;
 
             int coolingWallCount = 0;
             int nonCoolingWallCount = 0;
@@ -440,7 +241,7 @@ namespace hazroomrenovation.source.Systems {
             int nonSkyLightCount = 0;
             int exitCount = 0;
 
-            BlockAccess.Begin();
+            blockAccess.Begin();
 
             bool allChunksLoaded = true;
 
@@ -448,14 +249,16 @@ namespace hazroomrenovation.source.Systems {
             int posX = pos.X - halfSize;
             int posY = pos.Y - halfSize;
             int posZ = pos.Z - halfSize;
-            BlockPos npos = new(posY);
-            BlockPos bpos = new(posY);
+            //Original Code: BlockPos npos = new BlockPos();
+            //Original Code: BlockPos bpos = new BlockPos();
+            BlockPos npos = new(Dimensions.NormalWorld);
+            BlockPos bpos = new(Dimensions.NormalWorld);
             int dx, dy, dz;
 
             while (bfsQueue.Count > 0) {
                 int compressedPos = bfsQueue.Dequeue();
                 dx = compressedPos >> 10;
-                dy = compressedPos >> 5 & 0x1f;
+                dy = (compressedPos >> 5) & 0x1f;
                 dz = compressedPos & 0x1f;
                 npos.Set(posX + dx, posY + dy, posZ + dz);
                 bpos.Set(npos);
@@ -469,13 +272,13 @@ namespace hazroomrenovation.source.Systems {
                 if (dz < minz) minz = dz;
                 else if (dz > maxz) maxz = dz;
 
-                Block bBlock = BlockAccess.GetBlock(bpos);
+                Block bBlock = blockAccess.GetBlock(bpos);
 
                 foreach (BlockFacing facing in BlockFacing.ALLFACES) {
-                    facing.IterateThruFacingOffsets(npos);  // [Original Dev note] This must be the first command in the loop, to ensure all facings will be properly looped through regardless of any 'continue;' statements
+                    facing.IterateThruFacingOffsets(npos);  // This must be the first command in the loop, to ensure all facings will be properly looped through regardless of any 'continue;' statements
                     int heatRetention = bBlock.GetRetention(bpos, facing, EnumRetentionType.Heat);
 
-                    // [Original Dev note] We cannot exit current block, if the facing is heat retaining (e.g. chiselled block with solid side)
+                    // We cannot exit current block, if the facing is heat retaining (e.g. chiselled block with solid side)
                     if (bBlock.Id != 0 && heatRetention != 0) {
                         if (heatRetention < 0) coolingWallCount -= heatRetention;
                         else nonCoolingWallCount += heatRetention;
@@ -483,16 +286,16 @@ namespace hazroomrenovation.source.Systems {
                         continue;
                     }
 
-                    if (!BlockAccess.IsValidPos(npos)) {
+                    if (!blockAccess.IsValidPos(npos)) {
                         nonCoolingWallCount++;
                         continue;
                     }
 
-                    Block nBlock = BlockAccess.GetBlock(npos);
-                    allChunksLoaded &= BlockAccess.LastChunkLoaded;
+                    Block nBlock = blockAccess.GetBlock(npos);
+                    allChunksLoaded &= blockAccess.LastChunkLoaded;
                     heatRetention = nBlock.GetRetention(npos, facing.Opposite, EnumRetentionType.Heat);
 
-                    // [Original Dev note] We hit a wall, no need to scan further
+                    // We hit a wall, no need to scan further
                     if (heatRetention != 0) {
                         if (heatRetention < 0) coolingWallCount -= heatRetention;
                         else nonCoolingWallCount += heatRetention;
@@ -500,14 +303,14 @@ namespace hazroomrenovation.source.Systems {
                         continue;
                     }
 
-                    // [Original Dev note] Compute the new dx, dy, dz offsets for npos
+                    // Compute the new dx, dy, dz offsets for npos
                     dx = npos.X - posX;
                     dy = npos.Y - posY;
                     dz = npos.Z - posZ;
 
-                    // [Original Dev note] Only traverse within maxSize range, and overall room size must not exceed MAXROOMSIZE
-                    // [Original Dev note]   If outside that, count as an exit and don't continue searching in this direction
-                    // [Original Dev note]   Note: for performance, this switch statement ensures only one conditional check in each case on the dimension which has actually changed, instead of 6 conditionals or more
+                    // Only traverse within maxSize range, and overall room size must not exceed MAXROOMSIZE
+                    //   If outside that, count as an exit and don't continue searching in this direction
+                    //   Note: for performance, this switch statement ensures only one conditional check in each case on the dimension which has actually changed, instead of 6 conditionals or more
                     bool outsideCube = false;
                     switch (facing.Index) {
                         case 0: // North
@@ -536,14 +339,14 @@ namespace hazroomrenovation.source.Systems {
 
 
                     visitedIndex = (dx * ARRAYSIZE + dy) * ARRAYSIZE + dz;
-                    if (currentVisited[visitedIndex] == iteration) continue;   // [Original Dev note] continue if block position was already visited
+                    if (currentVisited[visitedIndex] == iteration) continue;   // continue if block position was already visited
                     currentVisited[visitedIndex] = iteration;
 
-                    // [Original Dev note] We only need to check the skylight if it's a block position not already visited ...
+                    // We only need to check the skylight if it's a block position not already visited ...
                     int skyLightIndex = dx * ARRAYSIZE + dz;
                     if (skyLightXZChecked[skyLightIndex] < iteration) {
                         skyLightXZChecked[skyLightIndex] = iteration;
-                        int light = BlockAccess.GetLightLevel(npos, EnumLightLevelType.OnlySunLight);
+                        int light = blockAccess.GetLightLevel(npos, EnumLightLevelType.OnlySunLight);
 
                         if (light >= api.World.SunBrightness - 1) {
                             skyLightCount++;
@@ -568,12 +371,12 @@ namespace hazroomrenovation.source.Systems {
             int volumeCount = 0;
             for (dx = 0; dx < sizex; dx++) {
                 for (dy = 0; dy < sizey; dy++) {
-                    visitedIndex = ((dx + minx) * ARRAYSIZE + dy + miny) * ARRAYSIZE + minz;
+                    visitedIndex = ((dx + minx) * ARRAYSIZE + (dy + miny)) * ARRAYSIZE + minz;
                     for (dz = 0; dz < sizez; dz++) {
                         if (currentVisited[visitedIndex + dz] == iteration) {
                             int index = (dy * sizez + dz) * sizex + dx;
 
-                            posInRoom[index / 8] = (byte)(posInRoom[index / 8] | 1 << index % 8);
+                            posInRoom[index / 8] = (byte)(posInRoom[index / 8] | (1 << (index % 8)));
                             volumeCount++;
                         }
                     }
@@ -601,5 +404,4 @@ namespace hazroomrenovation.source.Systems {
             };
         }
     }
-    
 }
