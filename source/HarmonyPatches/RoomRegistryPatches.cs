@@ -22,6 +22,9 @@ using static OpenTK.Graphics.OpenGL.GL;
 #nullable disable
 
 namespace hazroomrenovation.source.HarmonyPatches {
+    /// <summary>
+    /// All Harmony patches directed at the vanilla code's RoomRegistry.cs file.
+    /// </summary>
     [HarmonyPatch]
     public class RoomRegistryPatches {
 
