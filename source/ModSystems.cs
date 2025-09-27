@@ -22,9 +22,9 @@ namespace hazroomrenovation.source {
 
         public override void StartServerSide(ICoreServerAPI api) {
             Mod.Logger.Notification("Initializing StartServerSide method: " + Lang.Get("hazroomrenovation:hello"));
-            Harmony.DEBUG = false; // ACTIVATES HARMONY DEBUG, Turn off for full release builds.
+            Harmony.DEBUG = true; // ACTIVATES HARMONY DEBUG, Turn off for full release builds.
             if (Harmony.DEBUG == true) { 
-                Mod.Logger.Notification("HARMONY DEBUG IS ON");
+                Mod.Logger.Notification("HARMONY DEBUG IS ON - Beginning new Log Entry");
             }
             if (!Harmony.HasAnyPatches(Mod.Info.ModID)) {
                 patcher = new Harmony(Mod.Info.ModID);

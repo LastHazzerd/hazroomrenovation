@@ -66,7 +66,6 @@ namespace hazroomrenovation.source.HarmonyPatches {
         // The private instanced data that the method is dependant on does not get passed to my own code unless I actively send it from here, so I must include the private field data as extra arguments.
         public static void PatchRoomRegFindRoom(BlockPos pos, ref Room __result, int ___iteration, int[] ___currentVisited, int[] ___skyLightXZChecked, ICachingBlockAccessor ___blockAccessor, ICoreAPI ___api) {
             if (Harmony.DEBUG == true) FileLog.Log("FindRoom Patch");
-            Console.WriteLine("Running the patched FindRoomForPosition");
             #region Use one of VintageStory's datastructures to quickly and performantly store block position data as a compressed integer value.
             QueueOfInt bfsQueue = new(); // Enqueue a single value with four separate components, assumed to be signed int, in the range of -128 to +127
             #endregion
@@ -142,7 +141,8 @@ namespace hazroomrenovation.source.HarmonyPatches {
                 #region Uses the newly set 'bpos' value to tell the blockAccessor the location of the next block we'd like to assign to the 'bBlock' object.
                 Block bBlock = ___blockAccessor.GetBlock(bpos);
                 #endregion
-
+                
+                //bool exposingFlag = false;
                 #region Use a 'foreach' loop that accounts for each face of the block in question to see what is in the given face's direction.
                 foreach (BlockFacing facing in BlockFacing.ALLFACES) {
                     facing.IterateThruFacingOffsets(npos);  // This must be the first command in the loop, to ensure all facings will be properly looped through regardless of any 'continue;' statements
@@ -181,9 +181,14 @@ namespace hazroomrenovation.source.HarmonyPatches {
 
                         continue; //jump back to the top of the for loop.
                     } // Since this is a wall, the block types 'stairs'/'fence'/'chisel'/'slab' are important because the wall might not be heatRetaining, but it is still a 'wall' of sorts.
-                    else if (nBlock is (BlockStairs or BlockFence or BlockSlab) && heatRetention == 0) {
-                        nonCoolingWallCount++; exposingBlockCount++;
-                        continue; //jump back to the top of the for loop.
+                    else if (((nBlock is BlockStairs) || (nBlock is BlockFence) || (nBlock is BlockSlab)) & heatRetention == 0) {
+                        nonCoolingWallCount++; exposingBlockCount++; //exposingFlag = true;
+                        //continue; //jump back to the top of the for loop.
+                        //UPDATE: I realized that players can exploit blue cheese making by placing an exposing block and then a block behind it.
+                        //I need to find a way to counter this. I should re-evaluate how exposing blocks are counted. Worth noting, I am also counting enclosing blocks.
+                        //In theory, I could use the number of enclosing blocks and exposing blocks counted to identify if there's any open holes in the walls or if all the walls are accaptable blocks of some sort.
+                        //a 2x2 'window' of fences inside a 4x4 wall of stone would be the equivalent of 4 exposing faces and 8 enclosing faces.
+                        //
                     }
                     #endregion
 
@@ -202,13 +207,13 @@ namespace hazroomrenovation.source.HarmonyPatches {
                     bool outsideCube = false;
                     switch (facing.Index) {
                         case 0: // North
-                            if (dz < minz) outsideCube = dz < 0 || maxz - minz + 1 >= MAXROOMSIZE;
+                            if (dz < minz) outsideCube = dz < 0 || maxz - minz + 1 >= MAXROOMSIZE; //if the z value is less than the minimum seen z value, check if the z value is outside of the cube's min or max roomsize allowance.
                             break;
                         case 1: // East
                             if (dx > maxx) outsideCube = dx > maxSize || maxx - minx + 1 >= MAXROOMSIZE;
                             break;
                         case 2: // South
-                            if (dz > maxz) outsideCube = dz > maxSize || maxz - minz + 1 >= MAXROOMSIZE;
+                            if (dz > maxz) outsideCube = dz > maxSize || maxz - minz + 1 >= MAXROOMSIZE; //if the z value is greater than the minimum seen z value, check if the z value is outside of the cube's min or max roomsize allowance.
                             break;
                         case 3: // West
                             if (dx < minx) outsideCube = dx < 0 || maxx - minx + 1 >= MAXROOMSIZE;
@@ -220,7 +225,7 @@ namespace hazroomrenovation.source.HarmonyPatches {
                             if (dy < miny) outsideCube = dy < 0 || maxy - miny + 1 >= MAXROOMSIZE;
                             break;
                     }
-                    if (outsideCube) {
+                    if (outsideCube) { //if the above switch determins that the block is outside the allowed roomsize, add to the exitcount and jump back up to the top of the search loop.
                         exitCount++;
                         continue;
                     }
@@ -287,10 +292,11 @@ namespace hazroomrenovation.source.HarmonyPatches {
             }
             #endregion
 
-            Console.WriteLine("enclosing blocks = "+enclosingBlockCount+" | exposingBlockCount = "+exposingBlockCount);
+            //if (Harmony.DEBUG == true) Console.WriteLine("enclosing blocks = "+enclosingBlockCount+" | exposingBlockCount = "+exposingBlockCount);
 
             #region Return a RenRoom object with all the related data found by the method.
-            __result = new RenRoom() {
+            RenRoom toReturn = new() {
+                //obj counts
                 CoolingWallCount = coolingWallCount,
                 NonCoolingWallCount = nonCoolingWallCount,
                 SkylightCount = skyLightCount,
@@ -298,11 +304,28 @@ namespace hazroomrenovation.source.HarmonyPatches {
                 EnclosingBlockCount = enclosingBlockCount,
                 ExposingBlockCount = exposingBlockCount,
                 ExitCount = exitCount,
+                RoomTemp = 5, // Default is 5°C until I come up with a good way to calc internal temp. Will be using sources of heat and cold to modify it.
+                //chunk and pos checks
                 AnyChunkUnloaded = allChunksLoaded ? 0 : 1,
                 Location = new Cuboidi(posX + minx, posY + miny, posZ + minz, posX + maxx, posY + maxy, posZ + maxz),
                 PosInRoom = posInRoom,
-                IsSmallRoom = isCellar && exitCount == 0
+                //bool checks
+                IsEnclosedRenRoom = (exitCount == 0 & exposingBlockCount == 0) || (skyLightCount < nonSkyLightCount), // if there's no exits and exposing blocks, OR if there's less skylights than regular ceiling blocks. (caves)
+                IsGreenHouseRenRoom = (exitCount == 0 & exposingBlockCount == 0 & (skyLightCount > nonSkyLightCount)), // if there's no exits and exposing blocks, AND if there's more skylights than regular ceiling blocks.
+                IsSmallRoom = isCellar && (exitCount == 0 & exposingBlockCount == 0), //if it meets the cellar size requirements, AND there's no exits and exposing blocks.
+                //calculated values || room effects
+                SkyLightProportion = skyLightCount / Math.Max(1, skyLightCount + nonSkyLightCount), //proportion value of the skylight's effects.
+                CellarProportion = GameMath.Clamp(nonCoolingWallCount / Math.Max(1, coolingWallCount), 0f, 1f) //proportion value of the cellar's effects.
             };
+            //calculated values || room effects - that can't be in the above declaration.
+            if (toReturn.IsGreenHouseRenRoom) toReturn.Roomness = 5; // if it's a greenhouse then roomness has a temperature bonus.
+            else toReturn.Roomness = 0; //If not, then roomness is 0.
+
+            if (toReturn.IsEnclosedRenRoom || toReturn.IsGreenHouseRenRoom) { //if the room functions as a greenhouse or standard enclosed rooms.
+                toReturn.tempSourceModifier = (toReturn.RoomTemp / 5); //heat/cold sources affected to by this value.
+            }
+            else { toReturn.tempSourceModifier = 1; } //TODO - find a way to balance this value based on the room's sources of temperature, as well as insulation or exposed blocks.            
+            __result = toReturn;
             #endregion
         }
     }
