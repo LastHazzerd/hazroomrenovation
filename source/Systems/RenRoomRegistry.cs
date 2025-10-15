@@ -49,6 +49,8 @@ namespace hazroomrenovation.source.Systems {
         public int EnclosingBlockCount;
         /// <summary> number of blocks making up the walls/floor/ceiling can NOT be considered solid or insulating. </summary>
         public int ExposingBlockCount;
+        /// <summary> number of blocks making up the walls/floor/ceiling that are NOT solid/insulating, but aren't exposed to an 'exit' and thus do not count towards the exposing block count. </summary>
+        public int VentilatedBlockCount;
         /// <summary> numerical value representing the Y Position value of the rooms' lowest block. </summary>
         public int RoomWorldHeight;
         /// <summary> numerical value representing the level of heat retention a room has. </summary>
