@@ -76,7 +76,8 @@ namespace hazroomrenovation.source.HarmonyPatches {
         public static int ExitSearch(int minx, int miny, int minz, int maxx, int maxy, int maxz, int exposedBlocks, BlockPos seedPos, BlockPos startPos, BlockFacing forwardFace, int iteration, int[] currentVisited, ICachingBlockAccessor blockAccessor) {
             int halfSize = (ARRAYSIZE - 1) / 2;
             int maxSize = halfSize + halfSize;
-            BlockPos npos = new(Dimensions.NormalWorld);
+            BlockPos npos = new(Dimensions.NormalWorld),
+                bpos = new(Dimensions.NormalWorld);
             Block bBlock = blockAccessor.GetBlock(startPos), nBlock = bBlock;
             int posY = seedPos.Y - halfSize,
                 posX = seedPos.X - halfSize,
@@ -85,7 +86,7 @@ namespace hazroomrenovation.source.HarmonyPatches {
             int heatRetention;
             int visitedIndex;
             bool foundExit = false;
-
+            
             if (Harmony.DEBUG == true) Console.WriteLine("++Beginning Exit Search++");
 
             #region Linear searches extending from the 'returnPos' in all 5 directions not pointed towards the room.
@@ -96,6 +97,7 @@ namespace hazroomrenovation.source.HarmonyPatches {
                 if (searchDirection == forwardFace.Opposite) continue;
                 
                 npos.Set(startPos);
+                bpos.Set(startPos);
                 int cycle = 0;               
                 while (cycle < 3) { 
                     //When hitting a wall, try to 'snake' around in the other directions, incase there's not an immediately obvious hole.
@@ -134,13 +136,14 @@ namespace hazroomrenovation.source.HarmonyPatches {
                         }
                         else {
                             //if it's a block we've not visited already
-                            heatRetention = nBlock.GetRetention(npos, forwardFace.Opposite, EnumRetentionType.Heat);
+                            heatRetention = nBlock.GetRetention(npos, searchDirection.Opposite, EnumRetentionType.Heat);
                         }
                     }
                     //because we're no longer inside the room, an invalid pos will just be treated as a wall.
                     else { heatRetention = 1; }
 
                     if (heatRetention != 0) {
+                        npos.Set(bpos);
                         //If we hit a wall of any kind change direction in case it's a fluke.
                         switch (searchDirection.Index) {
                             case 0: { searchDirection = BlockFacing.WEST; break; }  //North (-z) to WEST
@@ -151,6 +154,9 @@ namespace hazroomrenovation.source.HarmonyPatches {
                             case 5: { searchDirection = BlockFacing.SOUTH; break; }    //Down (-y) to SOUTH
                         }
                         cycle++;
+                    }
+                    else {
+                        bpos.Set(npos);
                     }
                     //If we have not hit an open wall, continue moving npos in the same searchDirection.
                 }
@@ -298,99 +304,6 @@ namespace hazroomrenovation.source.HarmonyPatches {
                         continue;
                     }
                     #endregion
-                    // TODO - Refactor the exposing block requirements. I can't reasonably get it to work with multiple exposing blocks, so to keep things sane, exposing blocks can only be 1x1.
-                    #region If the current block is an 'exposing' type block, then we need to confirm if it's an external wall.
-                    // The block types 'stairs'/'fence'/'chisel'/'slab'/'door' could act as 'windows' that simply do not insulate the room.
-                    // Only windows of 1x1 will operate as exposing walls, any wider/taller and it'll be treated as vanilla does.
-                    else if (((bBlock is BlockStairs) || (bBlock is BlockFence) || (bBlock is BlockSlab) || (bBlock is BlockBaseDoor)) && heatRetention == 0) {
-                        if (Harmony.DEBUG == true) Console.WriteLine("= iteration: " + iteration + " ="); 
-                        if (Harmony.DEBUG == true) Console.WriteLine("Exposing block found: " + bBlock + ", while searching: " + facing + ".\nIt is a " + bBlock.Class);
-                        BlockPos checkPos = new(Dimensions.NormalWorld);
-                        checkPos.Set(bpos);
-                        BlockFacing direction = BlockFacing.UP;
-                        int cycles = 0;
-
-                        switch (facing.Index) {
-                            case 0: { direction = BlockFacing.WEST; break; }   //North (-z) to WEST
-                            case 1: { direction = BlockFacing.UP; break; }   //East (+x) to SOUTH
-                            case 2: { direction = BlockFacing.EAST; break; }   //South (+z) to EAST
-                            case 3: { direction = BlockFacing.DOWN; break; }   //West (-x) to NORTH
-                            case 4: { direction = BlockFacing.NORTH; break; }   //Up (+y) to NORTH
-                            case 5: { direction = BlockFacing.SOUTH; break; }   //Down (-y) to SOUTH
-                        }
-                        Block checkBlock = ___blockAccessor.GetBlock(checkPos);
-                        //Sequence to ensure we're inside an exposing block window that's 1x1x1.
-                        while (cycles < 2) {                            
-                            cycles++;
-                            //move checkPos to the position horizontally adjacent to bpos.
-                            checkPos.Set(PosTraversal(direction, checkPos));
-                            if (!___blockAccessor.IsValidPos(checkPos)) { break; }
-                            allChunksLoaded &= ___blockAccessor.LastChunkLoaded;
-                            checkBlock = ___blockAccessor.GetBlock(checkPos);
-                            heatRetention = checkBlock.GetRetention(checkPos, direction.Opposite, EnumRetentionType.Heat);
-
-                            //If the adjacent block is not heat retaining, then this block is not considered exposing and will be treated as an open block.
-                            if (heatRetention == 0) { break; }
-                            checkPos.Set(bpos);
-
-                            //move checkPos to the horizontal position opposite of bpos.
-                            checkPos.Set(PosTraversal(direction.Opposite, bpos));
-                            if (!___blockAccessor.IsValidPos(checkPos)) { break; }
-                            allChunksLoaded &= ___blockAccessor.LastChunkLoaded;
-                            checkBlock = ___blockAccessor.GetBlock(checkPos);
-                            heatRetention = checkBlock.GetRetention(checkPos, direction, EnumRetentionType.Heat);
-
-                            //If the adjacent block is not heat retaining, then this block is not considered exposing and will be treated as an open block.
-                            if (heatRetention == 0) { break; }
-                            checkPos.Set(bpos);
-
-                            //if we've cycled through all of Up/Down/Left/Right (cycles > 1), we found an exposing block surrounded by solid wall blocks.
-                            if (cycles > 1) {
-                                //check the block immedietly behind the exposing wall to ensure it's not solid or another exposing block.
-                                checkPos.Set(PosTraversal(facing, bpos));
-                                if (!___blockAccessor.IsValidPos(checkPos)) { break; }
-                                allChunksLoaded &= ___blockAccessor.LastChunkLoaded;
-                                checkBlock = ___blockAccessor.GetBlock(checkPos);
-                                heatRetention = checkBlock.GetRetention(checkPos, direction, EnumRetentionType.Heat);
-                                
-                                //If the block behind the exposing wall is solid or another exposing wall, then we will treat this exposing block as vanilla would.
-                                if (heatRetention != 0 || (checkBlock is BlockStairs) || (checkBlock is BlockFence) || (checkBlock is BlockSlab) || (checkBlock is BlockBaseDoor)) {
-                                    break;
-                                }
-                                //perform an exit search
-                                int exposingCount = ExitSearch(minx, miny, minz, maxx, maxy, maxz, 1, pos, checkPos, facing, ___iteration, ___currentVisited, ___blockAccessor);
-
-                                if (exposingCount > 0) {
-                                    //an exit was found, this block is an exposing wall block.
-                                    exposingBlocks += exposingCount;
-                                    exposingConfirm = true;
-                                    break;
-                                }
-                                else if (exposingCount == 0) {
-                                    //no exit was found, this block is a ventelation block.
-                                    ventilatedBlocks += exposingCount;
-                                    exposingConfirm = true;
-                                    break;
-                                }
-                                //If exposingCount was negative, then this was not an outside facing wall and the block will be treated as vanilla would.
-                            }
-
-                            //Reaching this means we haven't cycled to Up and Down yet.
-                            switch (facing.Index) {
-                                case 0: { direction = BlockFacing.UP; break; }   //North (-z) to UP
-                                case 1: { direction = BlockFacing.DOWN; break; }   //East (+x) to DOWN
-                                case 2: { direction = BlockFacing.DOWN; break; }   //South (+z) to DOWN
-                                case 3: { direction = BlockFacing.UP; break; }   //West (-x) to UP
-                                case 4: { direction = BlockFacing.EAST; break; }   //Up (+y) to EAST
-                                case 5: { direction = BlockFacing.WEST; break; }   //Down (-y) to WEST                                
-                            }
-                        }
-                        if (exposingConfirm == true) {
-                            if (Harmony.DEBUG == true) Console.WriteLine("Exposed Wall found at Pos: ["+bpos+"]. \n ==Breaking the current bpos foreach==");
-                            break; 
-                        }
-                    }
-                    #endregion
 
                     #region If the block IS air, but doesn't exist within the map's bounding box, then add to the nonCoolingWallCount.
                     if (!___blockAccessor.IsValidPos(npos)) {
@@ -414,8 +327,103 @@ namespace hazroomrenovation.source.HarmonyPatches {
 
                         //if (Harmony.DEBUG == true) Console.WriteLine("solid wall: continue");
                         continue; //jump back to the top of the for loop.
-                    } 
-                    #endregion                    
+                    }
+                    #endregion
+
+                    // TODO - Ensure that the nBlock that is discoverd to be an exposing block works with 'vent' blocks as well as the 'exposing' blocks.
+                    #region If the nBlock block is an 'exposing' type block, then we need to confirm if it's an external wall.
+                    // The block types 'stairs'/'fence'/'chisel'/'slab'/'door' could act as 'windows' that simply do not insulate the room.
+                    // Only windows of 1x1 will operate as exposing walls, any wider/taller and it'll be treated as vanilla does.
+                    else if (((nBlock is BlockStairs) || (nBlock is BlockFence) || (nBlock is BlockSlab) || (nBlock is BlockBaseDoor)) && heatRetention == 0) {
+                        if (Harmony.DEBUG == true) Console.WriteLine("= iteration: " + iteration + " =");
+                        if (Harmony.DEBUG == true) Console.WriteLine("Exposing block found: " + nBlock + ", while searching: " + facing + ".\nIt is a " + nBlock.Class);
+                        BlockPos checkPos = new(Dimensions.NormalWorld);
+                        checkPos.Set(npos);
+                        BlockFacing direction = BlockFacing.UP;
+                        int cycles = 0;
+
+                        switch (facing.Index) {
+                            case 0: { direction = BlockFacing.WEST; break; }   //North (-z) to WEST
+                            case 1: { direction = BlockFacing.UP; break; }   //East (+x) to SOUTH
+                            case 2: { direction = BlockFacing.EAST; break; }   //South (+z) to EAST
+                            case 3: { direction = BlockFacing.DOWN; break; }   //West (-x) to NORTH
+                            case 4: { direction = BlockFacing.NORTH; break; }   //Up (+y) to NORTH
+                            case 5: { direction = BlockFacing.SOUTH; break; }   //Down (-y) to SOUTH
+                        }
+                        Block checkBlock = ___blockAccessor.GetBlock(checkPos);
+                        //Sequence to ensure we're inside an exposing block window that's 1x1x1.
+                        while (cycles < 2) {
+                            cycles++;
+                            //move checkPos to the position horizontally adjacent to npos.
+                            checkPos.Set(PosTraversal(direction, checkPos));
+                            if (!___blockAccessor.IsValidPos(checkPos)) { break; }
+                            allChunksLoaded &= ___blockAccessor.LastChunkLoaded;
+                            checkBlock = ___blockAccessor.GetBlock(checkPos);
+                            heatRetention = checkBlock.GetRetention(checkPos, direction.Opposite, EnumRetentionType.Heat);
+
+                            //If the adjacent block is not heat retaining, then this block is not considered exposing and will be treated as an open block.
+                            if (heatRetention == 0) { break; }
+                            checkPos.Set(npos);
+
+                            //move checkPos to the horizontal position opposite of npos.
+                            checkPos.Set(PosTraversal(direction.Opposite, npos));
+                            if (!___blockAccessor.IsValidPos(checkPos)) { break; }
+                            allChunksLoaded &= ___blockAccessor.LastChunkLoaded;
+                            checkBlock = ___blockAccessor.GetBlock(checkPos);
+                            heatRetention = checkBlock.GetRetention(checkPos, direction, EnumRetentionType.Heat);
+
+                            //If the adjacent block is not heat retaining, then this block is not considered exposing and will be treated as an open block.
+                            if (heatRetention == 0) { break; }
+                            checkPos.Set(npos);
+
+                            //if we've cycled through all of Up/Down/Left/Right (cycles > 1), we found an exposing block surrounded by solid wall blocks.
+                            if (cycles > 1) {
+                                //check the block immedietly behind the exposing wall to ensure it's not solid or another exposing block.
+                                checkPos.Set(PosTraversal(facing, npos));
+                                if (!___blockAccessor.IsValidPos(checkPos)) { break; }
+                                allChunksLoaded &= ___blockAccessor.LastChunkLoaded;
+                                checkBlock = ___blockAccessor.GetBlock(checkPos);
+                                heatRetention = checkBlock.GetRetention(checkPos, direction, EnumRetentionType.Heat);
+
+                                //If the block behind the exposing wall is solid or another exposing wall, then we will treat this exposing block as vanilla would.
+                                if (heatRetention != 0 || (checkBlock is BlockStairs) || (checkBlock is BlockFence) || (checkBlock is BlockSlab) || (checkBlock is BlockBaseDoor)) {
+                                    break;
+                                }
+                                //perform an exit search
+                                int exposingCount = ExitSearch(minx, miny, minz, maxx, maxy, maxz, 1, pos, checkPos, facing, ___iteration, ___currentVisited, ___blockAccessor);
+
+                                if (exposingCount > 0) {
+                                    //an exit was found, this block is an exposing wall block.
+                                    exposingBlocks++;
+                                    exposingConfirm = true;
+                                    break;
+                                }
+                                else if (exposingCount == 0) {
+                                    //no exit was found, this block is a ventelation block.
+                                    ventilatedBlocks++;
+                                    exposingConfirm = true;
+                                    break;
+                                }
+                                //If exposingCount was negative, then this was not an outside facing wall and the block will be treated as vanilla would.
+                            }
+
+                            //Reaching this means we haven't cycled to Up and Down yet.
+                            switch (facing.Index) {
+                                case 0: { direction = BlockFacing.UP; break; }   //North (-z) to UP
+                                case 1: { direction = BlockFacing.DOWN; break; }   //East (+x) to DOWN
+                                case 2: { direction = BlockFacing.DOWN; break; }   //South (+z) to DOWN
+                                case 3: { direction = BlockFacing.UP; break; }   //West (-x) to UP
+                                case 4: { direction = BlockFacing.EAST; break; }   //Up (+y) to EAST
+                                case 5: { direction = BlockFacing.WEST; break; }   //Down (-y) to WEST                                
+                            }
+                        }
+                        if (exposingConfirm == true) {
+                            if (Harmony.DEBUG == true) Console.WriteLine("Exposed Wall found at Pos: [" + npos + "]. \n ==Continuing foreach to skip adding this block to queue==");
+                            continue;
+                        }
+                    }
+                    #endregion
+
                     #endregion
 
                     #region Compute the new dx, dy, dz offsets for npos
