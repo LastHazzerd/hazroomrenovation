@@ -60,573 +60,9 @@ namespace hazroomrenovation.source.HarmonyPatches {
             return pos;
         }
 
-
         /// <summary>
-        /// A method used to search through several 'exposing' block types to see if they form a wall or if they're just a block with no consequence.
-        /// Will return 0 if no wall is detected, -1 if we leave the roomSize limits, -404 if any of the BlockPos found are invalid, or a positive number if it found exposing wall block(s).
-        /// </summary>
-        /// <param name="maxSize"></param>
-        /// <param name="miny"></param>
-        /// <param name="seedPos"></param>
-        /// <param name="startPos"></param>
-        /// <param name="forwardFace"></param>
-        /// <param name="iteration"></param>
-        /// <param name="currentVisited"></param>
-        /// <param name="blockAccessor"></param>
-        /// <param name="bookmarkPos"></param>
-        /// <param name="exitPos"></param>
-        /// <returns></returns>
-        public static int ExposingSearch(int minx, int miny, int minz, int maxx, int maxy, int maxz, BlockPos seedPos, BlockPos startPos, BlockFacing forwardFace, int iteration, int[] currentVisited, ICachingBlockAccessor blockAccessor, out BlockPos exitStartPos) {
-            int halfSize = (ARRAYSIZE - 1) / 2;
-            int maxSize = halfSize + halfSize;
-            BlockFacing altfacing = BlockFacing.UP;
-            BlockFacing facing = BlockFacing.UP;
-            BlockPos npos = startPos, anchorPos = startPos, returnPos = startPos;
-            exitStartPos = startPos;
-            Block anchorBlock = blockAccessor.GetBlock(startPos), nBlock;
-            int posX = seedPos.X - halfSize;
-            int posY = seedPos.Y - halfSize;
-            int posZ = seedPos.Z - halfSize;
-            int dy = startPos.Y - posY,
-                dx = startPos.X - posX,
-                dz = startPos.Z - posZ;
-            int heatRetention,
-                visitedIndex,
-                potentialExposed = 1;
-            bool altPath = false;
-            bool roofFloor = false;
-            if (forwardFace == BlockFacing.UP || forwardFace == BlockFacing.DOWN) roofFloor = true;
-
-            //make sure current bBlock gets marked for the search.
-            heatRetention = anchorBlock.GetRetention(startPos, facing, EnumRetentionType.Heat);
-            visitedIndex = (dx * ARRAYSIZE + dy) * ARRAYSIZE + dz;
-            if (currentVisited[visitedIndex] > 0 || currentVisited[visitedIndex] != iteration) {
-                //If we've performed an exposing search on this block already, mark this as a negative value of the current iteration.
-                //We'll use negative numbers to indicate blocks that have been searched by this method.
-                currentVisited[visitedIndex] = -iteration;
-            }
-
-            //make sure above block isn't open air. if roof/floor, check west.
-            if (roofFloor == true) facing = BlockFacing.WEST;
-            if (Harmony.DEBUG == true) Console.WriteLine("Check above block isn't open air. \n" + "before iterate npos: " + npos + " | facing: " + facing);            
-            npos.Set(PosTraversal(facing, npos));            
-            if (Harmony.DEBUG == true) Console.WriteLine("after iterate npos: " + npos + " | facing: " + facing);
-            if (blockAccessor.IsValidPos(npos)) {
-                dy = npos.Y - posY;
-                dx = npos.X - posX;
-                dz = npos.Z - posZ;
-
-                #region Update the current min|max x|y|z value if the current dx|dy|dz value are less|greater than the recorded min|max x|y|z value
-                if (dx < minx) minx = dx;
-                else if (dx > maxx) maxx = dx;
-
-                if (dy < miny) miny = dy;
-                else if (dy > maxy) maxy = dy;
-
-                if (dz < minz) minz = dz;
-                else if (dz > maxz) maxz = dz;
-                #endregion
-
-                switch (facing.Index) {
-                    case 0: { if (dz < 0 || maxz - minz + 1 >= MAXROOMSIZE) { return -1; } break; } //North -z
-                    case 1: { if (dx > maxSize || maxx - minx + 1 >= MAXROOMSIZE) { return -1; } break; }//East +x
-                    case 2: { if (dz > maxSize || maxz - minz + 1 >= MAXROOMSIZE) { return -1; } break; }//South +z
-                    case 3: { if (dx < 0 || maxx - minx + 1 >= MAXROOMSIZE) { return -1; } break; } //West -x
-                    case 4: { if (dy > maxSize || maxy - miny + 1 >= MAXROOMSIZE) { return -1; } break; } //Up +y
-                    case 5: { if (dy < 0 || maxy - miny + 1 >= MAXROOMSIZE) { return -1; } break; } //Down -y
-                }
-                nBlock = blockAccessor.GetBlock(npos);
-                heatRetention = nBlock.GetRetention(npos, facing.Opposite, EnumRetentionType.Heat);
-
-                if (nBlock.Id == 0) { //above block is open Air; Invalidated exposing wall block search. 
-                    potentialExposed = 0;
-                    return potentialExposed;
-                }
-                else if (heatRetention == 0 && ((nBlock is BlockStairs) || (nBlock is BlockFence) || (nBlock is BlockSlab) || (nBlock is BlockBaseDoor))) {
-                    //above block is exposing.
-                    visitedIndex = (dx * ARRAYSIZE + dy) * ARRAYSIZE + dz;
-                    if (currentVisited[visitedIndex] > 0 || currentVisited[visitedIndex] != iteration) {
-                        //If we've performed an exposing search on this block already, mark this as a negative value of the current iteration.
-                        //We'll use negative numbers to indicate blocks that have been searched by this method.
-                        currentVisited[visitedIndex] = -iteration;
-                    }
-                    returnPos.Set(npos); //we want to remember where we left off behind us.
-                    potentialExposed++;
-                }
-                //if neither of these, then we assume it is a solid block.
-            }
-            else {
-                return -404; //if we hit an invalid position, return a negative number to let the main search know its invalid and should add to noncoolingblocks and execute a 'continue'.
-            }
-
-            //check if we're above an open block. If roof or floor, check to east.
-            if (roofFloor == true) { facing = BlockFacing.EAST; altfacing = BlockFacing.WEST; }
-            else { facing = BlockFacing.DOWN; }
-            npos.Set(startPos);
-            if (Harmony.DEBUG == true) Console.WriteLine("Check below block isn't open air. \n" + "before iterate npos: " + npos + " | facing: " + facing);
-            npos.Set(PosTraversal(facing, npos));
-            if (Harmony.DEBUG == true) Console.WriteLine("after iterate npos: " + npos + " | facing: " + facing);
-            if (blockAccessor.IsValidPos(npos)) {
-                dy = npos.Y - posY;
-                dx = npos.X - posX;
-                dz = npos.Z - posZ;
-
-                #region Update the current min|max x|y|z value if the current dx|dy|dz value are less|greater than the recorded min|max x|y|z value
-                if (dx < minx) minx = dx;
-                else if (dx > maxx) maxx = dx;
-
-                if (dy < miny) miny = dy;
-                else if (dy > maxy) maxy = dy;
-
-                if (dz < minz) minz = dz;
-                else if (dz > maxz) maxz = dz;
-                #endregion
-
-                switch (facing.Index) {
-                    case 0: { if (dz < 0 || maxz - minz + 1 >= MAXROOMSIZE) { return -1; } break; } //North -z
-                    case 1: { if (dx > maxSize || maxx - minx + 1 >= MAXROOMSIZE) { return -1; } break; }//East +x
-                    case 2: { if (dz > maxSize || maxz - minz + 1 >= MAXROOMSIZE) { return -1; } break; }//South +z
-                    case 3: { if (dx < 0 || maxx - minx + 1 >= MAXROOMSIZE) { return -1; } break; } //West -x
-                    case 4: { if (dy > maxSize || maxy - miny + 1 >= MAXROOMSIZE) { return -1; } break; } //Up +y
-                    case 5: { if (dy < 0 || maxy - miny + 1 >= MAXROOMSIZE) { return -1; } break; } //Down -y
-                }
-
-                nBlock = blockAccessor.GetBlock(npos);
-                heatRetention = nBlock.GetRetention(npos, facing.Opposite, EnumRetentionType.Heat);
-
-                ///TODO figure out why the block accessor is returing "air"
-                ///.
-                ///.
-                ///.
-
-
-                if (nBlock.Id == 0) { //below block is open Air; Invalidated exposing wall block search. 
-                    potentialExposed = 0;
-                    return potentialExposed;
-                }
-                else if (heatRetention == 0 && ((nBlock is BlockStairs) || (nBlock is BlockFence) || (nBlock is BlockSlab) || (nBlock is BlockBaseDoor))) {
-                    //below block is exposing.
-                    visitedIndex = (dx * ARRAYSIZE + dy) * ARRAYSIZE + dz;
-                    if (currentVisited[visitedIndex] > 0 || currentVisited[visitedIndex] != iteration) { //if we've haven't searched this pos yet.
-                        currentVisited[visitedIndex] = -iteration;
-                    }
-                    altPath = true;
-                    altfacing = facing;
-                    returnPos.Set(npos); //we want to remember where we left off behind us.
-                    potentialExposed++;
-                }
-                //if neither of these, then we assume it is a solid block.
-            }
-            else {
-                return -404;
-            }
-            //make sure the block behind us isn't open air, and that only one facing has another exposing block. If Roof/Floor, check North
-            if (roofFloor == true) { facing = BlockFacing.NORTH; }
-            else { facing = forwardFace.Opposite; }
-            npos.Set(startPos);
-            if (Harmony.DEBUG == true) Console.WriteLine("Check behind block isn't open air. \n" + "before iterate npos: " + npos + " | facing: " + facing);
-            npos.Set(PosTraversal(facing, npos));
-            if (Harmony.DEBUG == true) Console.WriteLine("after iterate npos: " + npos + " | facing: " + facing);
-            if (blockAccessor.IsValidPos(npos)) {
-                dy = npos.Y - posY;
-                dx = npos.X - posX;
-                dz = npos.Z - posZ;
-
-                #region Update the current min|max x|y|z value if the current dx|dy|dz value are less|greater than the recorded min|max x|y|z value
-                if (dx < minx) minx = dx;
-                else if (dx > maxx) maxx = dx;
-
-                if (dy < miny) miny = dy;
-                else if (dy > maxy) maxy = dy;
-
-                if (dz < minz) minz = dz;
-                else if (dz > maxz) maxz = dz;
-                #endregion
-
-                switch (facing.Index) {
-                    case 0: { if (dz < 0 || maxz - minz + 1 >= MAXROOMSIZE) { return -1; } break; } //North -z
-                    case 1: { if (dx > maxSize || maxx - minx + 1 >= MAXROOMSIZE) { return -1; } break; }//East +x
-                    case 2: { if (dz > maxSize || maxz - minz + 1 >= MAXROOMSIZE) { return -1; } break; }//South +z
-                    case 3: { if (dx < 0 || maxx - minx + 1 >= MAXROOMSIZE) { return -1; } break; } //West -x
-                    case 4: { if (dy > maxSize || maxy - miny + 1 >= MAXROOMSIZE) { return -1; } break; } //Up +y
-                    case 5: { if (dy < 0 || maxy - miny + 1 >= MAXROOMSIZE) { return -1; } break; } //Down -y
-                }
-
-                nBlock = blockAccessor.GetBlock(npos);
-                heatRetention = nBlock.GetRetention(npos, facing.Opposite, EnumRetentionType.Heat);
-
-
-                if (nBlock.Id == 0) { 
-                    //backward block is open; Invalidated exposing wall block search. 
-                    potentialExposed = 0;
-                    return potentialExposed;
-                }
-                else if (heatRetention == 0 && ((nBlock is BlockStairs) || (nBlock is BlockFence) || (nBlock is BlockSlab) || (nBlock is BlockBaseDoor))) {
-                    //behind block is exposing.
-                    visitedIndex = (dx * ARRAYSIZE + dy) * ARRAYSIZE + dz;
-                    if (currentVisited[visitedIndex] > 0 || currentVisited[visitedIndex] != iteration) { //if we've haven't searched this pos yet.
-                        currentVisited[visitedIndex] = -iteration;
-                    }
-                    if (potentialExposed > 1) { 
-                        //if the above/below block was already exposing, then this exposing block exceeds the allowed number of exposing blocks to qualify as a viable wall block.
-                        potentialExposed = 0;
-                        return potentialExposed;
-                    }
-                    else { 
-                        //if we made it this far, then the foward block being exposed means we must follow it until we hit an open block or boundry.
-                        potentialExposed++;
-                    }
-                    altPath = true;
-                    altfacing = facing;
-                    returnPos.Set(npos); //we want to remember where we left off behind us.
-                    npos.Set(startPos); //return to original spot to check forward direction.
-                }
-                else {//if neither of these, then we assume the forward block is solid.
-                    if (potentialExposed > 1) {
-                        facing = altfacing;     //If we found an exposed block above, this will set us to Up, if insted it was below, this will be Down.
-                    }
-                    npos.Set(returnPos); //move the nBlock back to returnPos, which is either at the start position, or in an exposing block above/below it.
-                }
-            }
-            else {
-                return -404;
-            }
-            //we've now determined which block we intend to start from for this exposing block search, and which facing we should head.
-            #region Navigate through the remaining exposed blocks, if any.
-            if (potentialExposed > 1 || altPath == true) { //Check if we have more iterating to do.
-                if (altPath == true) {
-                    facing = altfacing;
-                    anchorPos.Set(returnPos); //main block moving through the wall.
-                    npos.Set(returnPos); //block used to check adjacent and next forward block.
-                    switch (facing.Index) {
-                        case 0: // North (-Z)
-                            altfacing = BlockFacing.EAST;
-                            break;
-                        case 1: // East (+X)
-                            altfacing = BlockFacing.SOUTH;
-                            break;
-                        case 2: // South (+Z)
-                            altfacing = BlockFacing.WEST;
-                            break;
-                        case 3: // West (-X)
-                            altfacing = BlockFacing.NORTH;
-                            break;
-                        case 4: // Up (+Y)
-                            altfacing = BlockFacing.WEST;
-                            break;
-                        case 5: // Down (-Y)
-                            altfacing = BlockFacing.EAST;
-                            break;
-                    }
-                }
-                else {
-                    switch (forwardFace.Index) {
-                        case 0: // North (-Z)
-                            facing = BlockFacing.NORTH;
-                            altfacing = BlockFacing.EAST;
-                            break;
-                        case 1: // East (+X)
-                            facing = BlockFacing.EAST;
-                            altfacing = BlockFacing.SOUTH;
-                            break;
-                        case 2: // South (+Z)
-                            facing = BlockFacing.SOUTH;
-                            altfacing = BlockFacing.WEST;
-                            break;
-                        case 3: // West (-X)
-                            facing = BlockFacing.WEST;
-                            altfacing = BlockFacing.NORTH;
-                            break;
-                        case 4: // Up (+Y)
-                            facing = BlockFacing.SOUTH;
-                            altfacing = BlockFacing.WEST;
-                            break;
-                        case 5: // Down (-Y)
-                            facing = BlockFacing.NORTH;
-                            altfacing = BlockFacing.EAST;
-                            break;
-                    }
-                }
-                //check side block for non-solid blocks.
-                if (Harmony.DEBUG == true) Console.WriteLine("Check side block isn't also exposing. \n" + "before iterate npos: " + npos + " | altfacing: " + altfacing);
-                npos.Set(PosTraversal(altfacing, npos));
-                if (Harmony.DEBUG == true) Console.WriteLine("after iterate npos: " + npos + " | altfacing: " + altfacing);
-                if (blockAccessor.IsValidPos(npos)) {
-                    dy = npos.Y - posY;
-                    dx = npos.X - posX;
-                    dz = npos.Z - posZ;
-
-                    #region Update the current min|max x|y|z value if the current dx|dy|dz value are less|greater than the recorded min|max x|y|z value
-                    if (dx < minx) minx = dx;
-                    else if (dx > maxx) maxx = dx;
-
-                    if (dy < miny) miny = dy;
-                    else if (dy > maxy) maxy = dy;
-
-                    if (dz < minz) minz = dz;
-                    else if (dz > maxz) maxz = dz;
-                    #endregion
-
-                    switch (facing.Index) {
-                        case 0: { if (dz < 0 || maxz - minz + 1 >= MAXROOMSIZE) { return -1; } break; } //North -z
-                        case 1: { if (dx > maxSize || maxx - minx + 1 >= MAXROOMSIZE) { return -1; } break; }//East +x
-                        case 2: { if (dz > maxSize || maxz - minz + 1 >= MAXROOMSIZE) { return -1; } break; }//South +z
-                        case 3: { if (dx < 0 || maxx - minx + 1 >= MAXROOMSIZE) { return -1; } break; } //West -x
-                        case 4: { if (dy > maxSize || maxy - miny + 1 >= MAXROOMSIZE) { return -1; } break; } //Up +y
-                        case 5: { if (dy < 0 || maxy - miny + 1 >= MAXROOMSIZE) { return -1; } break; } //Down -y
-                    }
-
-                    nBlock = blockAccessor.GetBlock(npos);
-                    heatRetention = nBlock.GetRetention(npos, altfacing.Opposite, EnumRetentionType.Heat);
-
-                    if (heatRetention == 0) { //adjacent block is not solid. 
-                        potentialExposed = 0; //invalidated search.
-                        return potentialExposed;
-                    }
-                }
-                else {
-                    return -404;
-                }
-                npos.Set(anchorPos); //return to current pos.
-
-                //check other side block for non-solid blocks.
-                if (Harmony.DEBUG == true) Console.WriteLine("Check other side block is solid. \n" + "before iterate npos: " + npos + " | altfacing: " + altfacing);
-                npos.Set(PosTraversal(altfacing.Opposite, npos));
-                if (Harmony.DEBUG == true) Console.WriteLine("after iterate npos: " + npos + " | altfacing: " + altfacing);
-                if (blockAccessor.IsValidPos(npos)) {
-                    dy = npos.Y - posY;
-                    dx = npos.X - posX;
-                    dz = npos.Z - posZ;
-
-                    #region Update the current min|max x|y|z value if the current dx|dy|dz value are less|greater than the recorded min|max x|y|z value
-                    if (dx < minx) minx = dx;
-                    else if (dx > maxx) maxx = dx;
-
-                    if (dy < miny) miny = dy;
-                    else if (dy > maxy) maxy = dy;
-
-                    if (dz < minz) minz = dz;
-                    else if (dz > maxz) maxz = dz;
-                    #endregion
-
-                    switch (facing.Index) {
-                        case 0: { if (dz < 0 || maxz - minz + 1 >= MAXROOMSIZE) { return -1; } break; } //North -z
-                        case 1: { if (dx > maxSize || maxx - minx + 1 >= MAXROOMSIZE) { return -1; } break; }//East +x
-                        case 2: { if (dz > maxSize || maxz - minz + 1 >= MAXROOMSIZE) { return -1; } break; }//South +z
-                        case 3: { if (dx < 0 || maxx - minx + 1 >= MAXROOMSIZE) { return -1; } break; } //West -x
-                        case 4: { if (dy > maxSize || maxy - miny + 1 >= MAXROOMSIZE) { return -1; } break; } //Up +y
-                        case 5: { if (dy < 0 || maxy - miny + 1 >= MAXROOMSIZE) { return -1; } break; } //Down -y
-                    }
-                    nBlock = blockAccessor.GetBlock(npos);
-                    heatRetention = nBlock.GetRetention(npos, altfacing.Opposite, EnumRetentionType.Heat);
-
-                    if (heatRetention == 0) { //adjacent block is not solid. 
-                        potentialExposed = 0; //invalidated search.
-                        return potentialExposed;
-                    }
-                }
-                else {
-                    return -404;
-                }
-                npos.Set(anchorPos); //return to current pos.
-
-                if (Harmony.DEBUG == true) Console.WriteLine("Move facing direction. \n" + "before iterate npos: " + npos + " | facing: " + facing);
-                npos.Set(PosTraversal(facing, npos)); //move the facing direction we want.
-                if (Harmony.DEBUG == true) Console.WriteLine("after iterate npos: " + npos + " | facing: " + facing);
-                heatRetention = nBlock.GetRetention(npos, facing.Opposite, EnumRetentionType.Heat);
-                if (!blockAccessor.IsValidPos(npos)) { return -404; }
-                while (potentialExposed > 0 && heatRetention == 0 && ((nBlock is BlockStairs) || (nBlock is BlockFence) || (nBlock is BlockSlab) || (nBlock is BlockDoor))) { //while the next block is exposing.
-                    potentialExposed++; //we've found another potential exposing block.
-
-                    //check side for non-solid block.
-                    if (Harmony.DEBUG == true) Console.WriteLine("Check side for non-solid block. \n" + "before iterate npos: " + npos + " | altfacing: " + altfacing);
-                    npos.Set(PosTraversal(altfacing, npos));
-                    if (Harmony.DEBUG == true) Console.WriteLine("after iterate npos: " + npos + " | altfacing: " + altfacing);
-                    if (blockAccessor.IsValidPos(npos)) {
-                        dy = npos.Y - posY;
-                        dx = npos.X - posX;
-                        dz = npos.Z - posZ;
-
-                        #region Update the current min|max x|y|z value if the current dx|dy|dz value are less|greater than the recorded min|max x|y|z value
-                        if (dx < minx) minx = dx;
-                        else if (dx > maxx) maxx = dx;
-
-                        if (dy < miny) miny = dy;
-                        else if (dy > maxy) maxy = dy;
-
-                        if (dz < minz) minz = dz;
-                        else if (dz > maxz) maxz = dz;
-                        #endregion
-
-                        switch (facing.Index) {
-                            case 0: { if (dz < 0 || maxz - minz + 1 >= MAXROOMSIZE) { return -1; } break; } //North -z
-                            case 1: { if (dx > maxSize || maxx - minx + 1 >= MAXROOMSIZE) { return -1; } break; }//East +x
-                            case 2: { if (dz > maxSize || maxz - minz + 1 >= MAXROOMSIZE) { return -1; } break; }//South +z
-                            case 3: { if (dx < 0 || maxx - minx + 1 >= MAXROOMSIZE) { return -1; } break; } //West -x
-                            case 4: { if (dy > maxSize || maxy - miny + 1 >= MAXROOMSIZE) { return -1; } break; } //Up +y
-                            case 5: { if (dy < 0 || maxy - miny + 1 >= MAXROOMSIZE) { return -1; } break; } //Down -y
-                        }
-                        nBlock = blockAccessor.GetBlock(npos);
-                        heatRetention = nBlock.GetRetention(npos, altfacing.Opposite, EnumRetentionType.Heat);
-
-                        if (heatRetention == 0) { //adjacent block is not solid. 
-                            potentialExposed = 0; //invalidated search.
-                            return potentialExposed;
-                        }
-                    }
-                    else {
-                        return -404;
-                    }
-                    npos.Set(anchorPos); //return bpos to current pos.
-
-                    //check other side for non-solid block.
-                    if (Harmony.DEBUG == true) Console.WriteLine("Check other side for non-solid block. \n" + "before iterate npos: " + npos + " | altfacing: " + altfacing);
-                    npos.Set(PosTraversal(altfacing.Opposite, npos));
-                    if (Harmony.DEBUG == true) Console.WriteLine("after iterate npos: " + npos + " | altfacing: " + altfacing);
-                    if (blockAccessor.IsValidPos(npos)) {
-                        dy = npos.Y - posY;
-                        dx = npos.X - posX;
-                        dz = npos.Z - posZ;
-
-                        #region Update the current min|max x|y|z value if the current dx|dy|dz value are less|greater than the recorded min|max x|y|z value
-                        if (dx < minx) minx = dx;
-                        else if (dx > maxx) maxx = dx;
-
-                        if (dy < miny) miny = dy;
-                        else if (dy > maxy) maxy = dy;
-
-                        if (dz < minz) minz = dz;
-                        else if (dz > maxz) maxz = dz;
-                        #endregion
-
-                        switch (facing.Index) {
-                            case 0: { if (dz < 0 || maxz - minz + 1 >= MAXROOMSIZE) { return -1; } break; } //North -z
-                            case 1: { if (dx > maxSize || maxx - minx + 1 >= MAXROOMSIZE) { return -1; } break; }//East +x
-                            case 2: { if (dz > maxSize || maxz - minz + 1 >= MAXROOMSIZE) { return -1; } break; }//South +z
-                            case 3: { if (dx < 0 || maxx - minx + 1 >= MAXROOMSIZE) { return -1; } break; } //West -x
-                            case 4: { if (dy > maxSize || maxy - miny + 1 >= MAXROOMSIZE) { return -1; } break; } //Up +y
-                            case 5: { if (dy < 0 || maxy - miny + 1 >= MAXROOMSIZE) { return -1; } break; } //Down -y
-                        }
-                        nBlock = blockAccessor.GetBlock(npos);
-                        heatRetention = nBlock.GetRetention(npos, altfacing.Opposite, EnumRetentionType.Heat);
-
-                        if (heatRetention == 0) { //adjacent block is not solid. 
-                            potentialExposed = 0; //invalidated search.
-                            return potentialExposed;
-                        }
-                    }
-                    else {
-                        return -404;
-                    }
-                    npos.Set(anchorPos); //return bpos to current pos.
-
-                    if (Harmony.DEBUG == true) Console.WriteLine("Move facing direction. \n" + "before iterate npos: " + npos + " | facing: " + facing);
-                    npos.Set(PosTraversal(facing, npos)); //move the facing direction we want.
-                    if (Harmony.DEBUG == true) Console.WriteLine("after iterate npos: " + npos + " | facing: " + facing);
-                    if (blockAccessor.IsValidPos(npos)) {
-                        dy = npos.Y - posY;
-                        dx = npos.X - posX;
-                        dz = npos.Z - posZ;
-
-                        #region Update the current min|max x|y|z value if the current dx|dy|dz value are less|greater than the recorded min|max x|y|z value
-                        if (dx < minx) minx = dx;
-                        else if (dx > maxx) maxx = dx;
-
-                        if (dy < miny) miny = dy;
-                        else if (dy > maxy) maxy = dy;
-
-                        if (dz < minz) minz = dz;
-                        else if (dz > maxz) maxz = dz;
-                        #endregion
-
-                        switch (facing.Index) {
-                            case 0: { if (dz < 0 || maxz - minz + 1 >= MAXROOMSIZE) { return -1; } break; } //North -z
-                            case 1: { if (dx > maxSize || maxx - minx + 1 >= MAXROOMSIZE) { return -1; } break; }//East +x
-                            case 2: { if (dz > maxSize || maxz - minz + 1 >= MAXROOMSIZE) { return -1; } break; }//South +z
-                            case 3: { if (dx < 0 || maxx - minx + 1 >= MAXROOMSIZE) { return -1; } break; } //West -x
-                            case 4: { if (dy > maxSize || maxy - miny + 1 >= MAXROOMSIZE) { return -1; } break; } //Up +y
-                            case 5: { if (dy < 0 || maxy - miny + 1 >= MAXROOMSIZE) { return -1; } break; } //Down -y
-                        }
-                        nBlock = blockAccessor.GetBlock(npos);
-                        heatRetention = nBlock.GetRetention(npos, facing, EnumRetentionType.Heat);
-                        anchorPos.Set(npos);
-
-                        visitedIndex = (dx * ARRAYSIZE + dy) * ARRAYSIZE + dz;
-                        if (currentVisited[visitedIndex] > 0 || currentVisited[visitedIndex] != iteration) { 
-                            //if we've haven't searched this pos yet.
-                            currentVisited[visitedIndex] = -iteration;
-                        }
-
-                        if (nBlock.Id == 0) { 
-                            //next block is open air. 
-                            potentialExposed = 0; //invalidated search.
-                            return potentialExposed;
-                        }
-                        else if (heatRetention != 0 && altPath == true) {
-                            //if we finally hit a solid wall while we were going in reverse.
-                            //jump back to return point and head in the opposite direction.
-                            exitStartPos.Set(npos);
-                            npos.Set(startPos);
-                            anchorPos.Set(startPos);
-                            facing = facing.Opposite;
-
-                            if (Harmony.DEBUG == true) Console.WriteLine("Check reverse direction after altpath. \n" + "before iterate npos: " + npos + " | facing: " + facing);
-                            npos.Set(PosTraversal(facing, npos)); //move the facing direction we want.
-                            if (Harmony.DEBUG == true) Console.WriteLine("after iterate npos: " + npos + " | facing: " + facing);
-                            if (blockAccessor.IsValidPos(npos)) {
-                                dy = npos.Y - posY;
-                                dx = npos.X - posX;
-                                dz = npos.Z - posZ;
-
-                                #region Update the current min|max x|y|z value if the current dx|dy|dz value are less|greater than the recorded min|max x|y|z value
-                                if (dx < minx) minx = dx;
-                                else if (dx > maxx) maxx = dx;
-
-                                if (dy < miny) miny = dy;
-                                else if (dy > maxy) maxy = dy;
-
-                                if (dz < minz) minz = dz;
-                                else if (dz > maxz) maxz = dz;
-                                #endregion
-
-                                switch (facing.Index) {
-                                    case 0: { if (dz < 0 || maxz - minz + 1 >= MAXROOMSIZE) { return -1; } break; } //North -z
-                                    case 1: { if (dx > maxSize || maxx - minx + 1 >= MAXROOMSIZE) { return -1; } break; }//East +x
-                                    case 2: { if (dz > maxSize || maxz - minz + 1 >= MAXROOMSIZE) { return -1; } break; }//South +z
-                                    case 3: { if (dx < 0 || maxx - minx + 1 >= MAXROOMSIZE) { return -1; } break; } //West -x
-                                    case 4: { if (dy > maxSize || maxy - miny + 1 >= MAXROOMSIZE) { return -1; } break; } //Up +y
-                                    case 5: { if (dy < 0 || maxy - miny + 1 >= MAXROOMSIZE) { return -1; } break; } //Down -y
-                                }
-                                nBlock = blockAccessor.GetBlock(npos);
-                                heatRetention = nBlock.GetRetention(npos, facing, EnumRetentionType.Heat);
-
-                                visitedIndex = (dx * ARRAYSIZE + dy) * ARRAYSIZE + dz;
-                                if (currentVisited[visitedIndex] > 0 || currentVisited[visitedIndex] != iteration) { //if we've haven't searched this pos yet.
-                                    currentVisited[visitedIndex] = -iteration;
-                                }
-
-                                if (nBlock.Id == 0) { //next block is open air. 
-                                    potentialExposed = 0; //invalidated search.
-                                    return potentialExposed;
-                                }
-                            }
-
-                        }
-                    }
-                    else {
-                        //if the next block isn't valid then we can't continue the search anyway.
-                        return -404;
-                    } 
-                }
-            }
-            //If we make it here, then we have successfully found a wall with a complete set of exposing blocks inside it. 
-            #endregion
-            return potentialExposed;
-        }
-
-        /// <summary>
-        /// A simple search casting in linear directions to see if there's any immediatly obvoius exit beyond a specific point, checking the directions Forward/Up/Down/Left/Right from the provided 'startPos'.
-        /// Returns 0 if no exit was found. Returns 1 if an exit was found. Returns -1 if a previously visited internal air block was somehow found.  Returns -2 if the wall has a solid wall directly behind it. Returns -3 if an invalid pos was found.
+        /// <para> A simple search casting in linear directions to see if there's any immediatly obvoius exit beyond a specific point, checking the directions Forward/Up/Down/Left/Right from the provided 'startPos'. </para>
+        /// <para> 0 = no exit found | 1 = an exit found | -1 = A previously visited internal air block found. </para> 
         /// </summary>
         /// <param name="maxSize"></param>
         /// <param name="miny"></param>
@@ -637,127 +73,75 @@ namespace hazroomrenovation.source.HarmonyPatches {
         /// <param name="currentVisited"></param>
         /// <param name="blockAccessor"></param>
         /// <returns></returns>
-        public static int ExitSearch(int minx, int miny, int minz, int maxx, int maxy, int maxz, int exposedBlocks, BlockPos seedPos, BlockPos startPos, BlockFacing forwardFace, BlockFacing wallDirection, int iteration, int[] currentVisited, ICachingBlockAccessor blockAccessor, out int exposedConfirm) {
+        public static int ExitSearch(int minx, int miny, int minz, int maxx, int maxy, int maxz, int exposedBlocks, BlockPos seedPos, BlockPos startPos, BlockFacing forwardFace, int iteration, int[] currentVisited, ICachingBlockAccessor blockAccessor) {
             int halfSize = (ARRAYSIZE - 1) / 2;
             int maxSize = halfSize + halfSize;
-            BlockPos npos = startPos, bpos = startPos, returnPos = startPos;
-            Block bBlock = blockAccessor.GetBlock(bpos), nBlock = bBlock;
+            BlockPos npos = new(Dimensions.NormalWorld);
+            Block bBlock = blockAccessor.GetBlock(startPos), nBlock = bBlock;
             int posY = seedPos.Y - halfSize,
                 posX = seedPos.X - halfSize,
                 posZ = seedPos.Z - halfSize;
             int dy, dx, dz;
             int heatRetention;
             int visitedIndex;
-            int wallCheck = 0,
-                wallTotal = exposedBlocks;
             bool foundExit = false;
-            exposedConfirm = exposedBlocks;
-            //Check each exposed block to ensure it's not immediately followed by a solid wall. Each exposing block with a wall outside of it will not be considered exposing.
-            while (wallCheck < wallTotal) {
-                //initial check of the first block beyond the wall.
-                npos.Set(PosTraversal(forwardFace, npos));
-                wallCheck++;
-                if (!blockAccessor.IsValidPos(npos)) {
-                    //if we hit an invalid POS beyond the wall, count it as solid and move to the next.
-                    --exposedConfirm;
-                    if (exposedConfirm == 0) { return -2; }
-                    npos.Set(bpos);
-                    //move down the wall to check the next block.
-                    bpos.Set(PosTraversal(wallDirection, bpos));
-                    if (!blockAccessor.IsValidPos(bpos)) { return -3; } //if we hit an invalid POS, return -3.
-                    continue;
-                }
-                dy = npos.Y - posY;
-                dx = npos.X - posX;
-                dz = npos.Z - posZ;
 
-                #region Update the current min|max x|y|z value if the current dx|dy|dz value are less|greater than the recorded min|max x|y|z value
-                if (dx < minx) minx = dx;
-                else if (dx > maxx) maxx = dx;
+            if (Harmony.DEBUG == true) Console.WriteLine("++Beginning Exit Search++");
 
-                if (dy < miny) miny = dy;
-                else if (dy > maxy) maxy = dy;
-
-                if (dz < minz) minz = dz;
-                else if (dz > maxz) maxz = dz;
-                #endregion
-
-                switch (forwardFace.Index) {
-                    case 0: { if (dz < 0 || maxz - minz + 1 >= MAXROOMSIZE) { foundExit = true;} break; } //North -z
-                    case 1: { if (dx > maxSize || maxx - minx + 1 >= MAXROOMSIZE) { foundExit = true;} break; }//East +x
-                    case 2: { if (dz > maxSize || maxz - minz + 1 >= MAXROOMSIZE) { foundExit = true;} break; }//South +z
-                    case 3: { if (dx < 0 || maxx - minx + 1 >= MAXROOMSIZE) { foundExit = true;} break; } //West -x
-                    case 4: { if (dy > maxSize || maxy - miny + 1 >= MAXROOMSIZE) { foundExit = true;} break; } //Up +y
-                    case 5: { if (dy < 0 || maxy - miny + 1 >= MAXROOMSIZE) { foundExit = true;} break; } //Down -y
-                }
-
-                if (wallCheck == wallTotal) returnPos.Set(npos); //if this is the last check, then this will be where the exit search starts.
-                nBlock = blockAccessor.GetBlock(npos);
-                heatRetention = nBlock.GetRetention(npos, forwardFace.Opposite, EnumRetentionType.Heat);
-
-                visitedIndex = (dx * ARRAYSIZE + dy) * ARRAYSIZE + dz;
-                if (currentVisited[visitedIndex] == iteration) { //If we find a block we've already visited OUTSIDE of this wall, and it's positive, then we assume it to be an internal block.
-                    return -1;
-                }
-                if (heatRetention != 0) { --exposedConfirm; }
-                if (exposedConfirm == 0) return -2; //if we go through all the blocks and determine that there is no openings behind them, then they're not exposing at all. return -2.
-                //move down the wall to check the next block.
-                bpos.Set(PosTraversal(wallDirection, bpos));
-                npos.Set(bpos);
-                if (!blockAccessor.IsValidPos(bpos)) { return -3; } //if we hit an invalid POS inside the wall, return -3.
-
-            }
-            if (foundExit == true) {
-                //if we found an exit during the wall check, return 1.
-                return 1;
-            }
             #region Linear searches extending from the 'returnPos' in all 5 directions not pointed towards the room.
             BlockFacing searchDirection = forwardFace;
-            foreach (BlockFacing facing in BlockFacing.ALLFACES) { //will cycle through all faces of the returnPos block (will skip the face opposite of 'forwardFace').
-                if (searchDirection == forwardFace.Opposite) continue;
-                npos.Set(returnPos);
-                int cycle = 0;
+            foreach (BlockFacing facing in BlockFacing.ALLFACES) {
+                //will cycle through all faces of the returnPos block (will skip the face opposite of 'forwardFace').
                 searchDirection = facing;
-                while (cycle < 3) { //When hitting a wall, try to 'snake' around in the other directions, incase there's not an immediately obvious hole.                    
+                if (searchDirection == forwardFace.Opposite) continue;
+                
+                npos.Set(startPos);
+                int cycle = 0;               
+                while (cycle < 3) { 
+                    //When hitting a wall, try to 'snake' around in the other directions, incase there's not an immediately obvious hole.
+                    //npos will be moved in the 'searchDirection' relative to the current 'bpos' value.
                     npos.Set(PosTraversal(searchDirection, npos));
                     if (blockAccessor.IsValidPos(npos)) {
-                        //because we're no longer inside the room, and invalid pos will just be treated as a wall.
                         dy = npos.Y - posY;
                         dx = npos.X - posX;
                         dz = npos.Z - posZ;
 
-                        #region Update the current min|max x|y|z value if the current dx|dy|dz value are less|greater than the recorded min|max x|y|z value
-                        if (dx < minx) minx = dx;
-                        else if (dx > maxx) maxx = dx;
-
-                        if (dy < miny) miny = dy;
-                        else if (dy > maxy) maxy = dy;
-
-                        if (dz < minz) minz = dz;
-                        else if (dz > maxz) maxz = dz;
-                        #endregion
-
+                        //check if we've found an exit point after traversing.
                         switch (searchDirection.Index) {
-                            case 0: { if (dz < 0 || maxz - minz + 1 >= MAXROOMSIZE) { return 1; } break; } //North -z
-                            case 1: { if (dx > maxSize || maxx - minx + 1 >= MAXROOMSIZE) { return 1; } break; }//East +x
-                            case 2: { if (dz > maxSize || maxz - minz + 1 >= MAXROOMSIZE) { return 1; } break; }//South +z
-                            case 3: { if (dx < 0 || maxx - minx + 1 >= MAXROOMSIZE) { return 1; } break; } //West -x
-                            case 4: { if (dy > maxSize || maxy - miny + 1 >= MAXROOMSIZE) { return 1; } break; } //Up +y
-                            case 5: { if (dy < 0 || maxy - miny + 1 >= MAXROOMSIZE) { return 1; } break; } //Down -y
+                            case 0: { foundExit = dz < 0 || maxz - minz + 1 >= MAXROOMSIZE; break; } //North -z
+                            case 1: { foundExit = dx > maxSize || maxx - minx + 1 >= MAXROOMSIZE; break; }//East +x
+                            case 2: { foundExit = dz > maxSize || maxz - minz + 1 >= MAXROOMSIZE; break; }//South +z
+                            case 3: { foundExit = dx < 0 || maxx - minx + 1 >= MAXROOMSIZE; break; } //West -x
+                            case 4: { foundExit = dy > maxSize || maxy - miny + 1 >= MAXROOMSIZE; break; } //Up +y
+                            case 5: { foundExit = dy < 0 || maxy - miny + 1 >= MAXROOMSIZE; break; } //Down -y
                         }
+                        if (foundExit == true) {
+                            if (Harmony.DEBUG == true) Console.WriteLine("Exit Found: Exposing Block");
+                            return 1;
+                        }
+
                         visitedIndex = (dx * ARRAYSIZE + dy) * ARRAYSIZE + dz;
-                        if (currentVisited[visitedIndex] == iteration) { //if we find a block that's already marked as visited.
-                            return -1;
+                        nBlock = blockAccessor.GetBlock(npos);
+                        //check if we've seen this block already
+                        if (currentVisited[visitedIndex] == iteration) {
+                            //if we find an open air block that's already marked as visited; We will assume we're still inside the room and this isn't an exposing wall.
+                            if (nBlock.Id == 0) {
+                                if (Harmony.DEBUG == true) Console.WriteLine("Already visited block. ["+nBlock+" at position: "+npos+"] Internal Block");
+                                return -1; 
+                            }
+                            //previously visited exposing walls will be treated as solid walls. (To avoid re-entering the room if it's horseshoe or donut shaped.)
+                            else heatRetention = 1;
                         }
-                        else if (Math.Abs(currentVisited[visitedIndex]) == iteration) { heatRetention = 1; } //previously visited exposing walls will be treated as solid walls.
                         else {
-                            nBlock = blockAccessor.GetBlock(npos);
+                            //if it's a block we've not visited already
                             heatRetention = nBlock.GetRetention(npos, forwardFace.Opposite, EnumRetentionType.Heat);
                         }
                     }
+                    //because we're no longer inside the room, an invalid pos will just be treated as a wall.
                     else { heatRetention = 1; }
-                    //IF we hit a wall of any kind change direction in case it's a fluke.
+
                     if (heatRetention != 0) {
+                        //If we hit a wall of any kind change direction in case it's a fluke.
                         switch (searchDirection.Index) {
                             case 0: { searchDirection = BlockFacing.WEST; break; }  //North (-z) to WEST
                             case 1: { searchDirection = BlockFacing.UP; break; } //East (+x) to UP
@@ -768,9 +152,11 @@ namespace hazroomrenovation.source.HarmonyPatches {
                         }
                         cycle++;
                     }
+                    //If we have not hit an open wall, continue moving npos in the same searchDirection.
                 }
-                npos.Set(returnPos); //return to the starting position of the search so we can iterate to the next face.
+                npos.Set(startPos); //return to the starting position of the search so we can iterate to the next face.
             }
+            if (Harmony.DEBUG == true) Console.WriteLine("No exits found: Ventilation Block.");
             return 0; //we found no exit or issue. The exposing blocks will be considered 'ventilation blocks'
             #endregion
         }
@@ -864,9 +250,10 @@ namespace hazroomrenovation.source.HarmonyPatches {
             BlockPos returnPos = npos; //create a backup Pos in case we need to return.
             int dx, dy, dz; // Additionally creates 3 int variables representing the 'decompressed' x|y|z integer values
             #endregion
-
+            if (Harmony.DEBUG == true) Console.WriteLine("== [Begining the search] ==");
             #region [THE SEARCH] Use a 'Floodfill' Breadth-First-Search sequence to identify the boundries and contents of the room. This while-loop will be modified from the original code to accomodate new room types.
             while (bfsQueue.Count > 0) {
+                //if (Harmony.DEBUG == true) Console.WriteLine("= iteration: " + iteration + " =");
 
                 #region Dequeue the current xyz block POS data from 'bfsQueue' and use it to set BlockPos objects 'npos' and 'bpos'
                 int compressedPos = bfsQueue.Dequeue();
@@ -894,9 +281,11 @@ namespace hazroomrenovation.source.HarmonyPatches {
 
                 //bool exposingFlag = false;
                 #region Use a 'foreach' loop that accounts for each face of the block in question to see what is in the given face's direction.
+                
                 foreach (BlockFacing facing in BlockFacing.ALLFACES) {
                     facing.IterateThruFacingOffsets(npos);  // This must be the first command in the loop, to ensure all facings will be properly looped through regardless of any 'continue;' statements
                     int heatRetention = bBlock.GetRetention(bpos, facing, EnumRetentionType.Heat);
+                    bool exposingConfirm = false;
 
                     #region Check if the current or next blocks are solid, if yes then record relavent data and restart loop, else prepare to move to the next block.
 
@@ -909,10 +298,104 @@ namespace hazroomrenovation.source.HarmonyPatches {
                         continue;
                     }
                     #endregion
+                    // TODO - Refactor the exposing block requirements. I can't reasonably get it to work with multiple exposing blocks, so to keep things sane, exposing blocks can only be 1x1.
+                    #region If the current block is an 'exposing' type block, then we need to confirm if it's an external wall.
+                    // The block types 'stairs'/'fence'/'chisel'/'slab'/'door' could act as 'windows' that simply do not insulate the room.
+                    // Only windows of 1x1 will operate as exposing walls, any wider/taller and it'll be treated as vanilla does.
+                    else if (((bBlock is BlockStairs) || (bBlock is BlockFence) || (bBlock is BlockSlab) || (bBlock is BlockBaseDoor)) && heatRetention == 0) {
+                        if (Harmony.DEBUG == true) Console.WriteLine("= iteration: " + iteration + " ="); 
+                        if (Harmony.DEBUG == true) Console.WriteLine("Exposing block found: " + bBlock + ", while searching: " + facing + ".\nIt is a " + bBlock.Class);
+                        BlockPos checkPos = new(Dimensions.NormalWorld);
+                        checkPos.Set(bpos);
+                        BlockFacing direction = BlockFacing.UP;
+                        int cycles = 0;
+
+                        switch (facing.Index) {
+                            case 0: { direction = BlockFacing.WEST; break; }   //North (-z) to WEST
+                            case 1: { direction = BlockFacing.UP; break; }   //East (+x) to SOUTH
+                            case 2: { direction = BlockFacing.EAST; break; }   //South (+z) to EAST
+                            case 3: { direction = BlockFacing.DOWN; break; }   //West (-x) to NORTH
+                            case 4: { direction = BlockFacing.NORTH; break; }   //Up (+y) to NORTH
+                            case 5: { direction = BlockFacing.SOUTH; break; }   //Down (-y) to SOUTH
+                        }
+                        Block checkBlock = ___blockAccessor.GetBlock(checkPos);
+                        //Sequence to ensure we're inside an exposing block window that's 1x1x1.
+                        while (cycles < 2) {                            
+                            cycles++;
+                            //move checkPos to the position horizontally adjacent to bpos.
+                            checkPos.Set(PosTraversal(direction, checkPos));
+                            if (!___blockAccessor.IsValidPos(checkPos)) { break; }
+                            allChunksLoaded &= ___blockAccessor.LastChunkLoaded;
+                            checkBlock = ___blockAccessor.GetBlock(checkPos);
+                            heatRetention = checkBlock.GetRetention(checkPos, direction.Opposite, EnumRetentionType.Heat);
+
+                            //If the adjacent block is not heat retaining, then this block is not considered exposing and will be treated as an open block.
+                            if (heatRetention == 0) { break; }
+                            checkPos.Set(bpos);
+
+                            //move checkPos to the horizontal position opposite of bpos.
+                            checkPos.Set(PosTraversal(direction.Opposite, bpos));
+                            if (!___blockAccessor.IsValidPos(checkPos)) { break; }
+                            allChunksLoaded &= ___blockAccessor.LastChunkLoaded;
+                            checkBlock = ___blockAccessor.GetBlock(checkPos);
+                            heatRetention = checkBlock.GetRetention(checkPos, direction, EnumRetentionType.Heat);
+
+                            //If the adjacent block is not heat retaining, then this block is not considered exposing and will be treated as an open block.
+                            if (heatRetention == 0) { break; }
+                            checkPos.Set(bpos);
+
+                            //if we've cycled through all of Up/Down/Left/Right (cycles > 1), we found an exposing block surrounded by solid wall blocks.
+                            if (cycles > 1) {
+                                //check the block immedietly behind the exposing wall to ensure it's not solid or another exposing block.
+                                checkPos.Set(PosTraversal(facing, bpos));
+                                if (!___blockAccessor.IsValidPos(checkPos)) { break; }
+                                allChunksLoaded &= ___blockAccessor.LastChunkLoaded;
+                                checkBlock = ___blockAccessor.GetBlock(checkPos);
+                                heatRetention = checkBlock.GetRetention(checkPos, direction, EnumRetentionType.Heat);
+                                
+                                //If the block behind the exposing wall is solid or another exposing wall, then we will treat this exposing block as vanilla would.
+                                if (heatRetention != 0 || (checkBlock is BlockStairs) || (checkBlock is BlockFence) || (checkBlock is BlockSlab) || (checkBlock is BlockBaseDoor)) {
+                                    break;
+                                }
+                                //perform an exit search
+                                int exposingCount = ExitSearch(minx, miny, minz, maxx, maxy, maxz, 1, pos, checkPos, facing, ___iteration, ___currentVisited, ___blockAccessor);
+
+                                if (exposingCount > 0) {
+                                    //an exit was found, this block is an exposing wall block.
+                                    exposingBlocks += exposingCount;
+                                    exposingConfirm = true;
+                                    break;
+                                }
+                                else if (exposingCount == 0) {
+                                    //no exit was found, this block is a ventelation block.
+                                    ventilatedBlocks += exposingCount;
+                                    exposingConfirm = true;
+                                    break;
+                                }
+                                //If exposingCount was negative, then this was not an outside facing wall and the block will be treated as vanilla would.
+                            }
+
+                            //Reaching this means we haven't cycled to Up and Down yet.
+                            switch (facing.Index) {
+                                case 0: { direction = BlockFacing.UP; break; }   //North (-z) to UP
+                                case 1: { direction = BlockFacing.DOWN; break; }   //East (+x) to DOWN
+                                case 2: { direction = BlockFacing.DOWN; break; }   //South (+z) to DOWN
+                                case 3: { direction = BlockFacing.UP; break; }   //West (-x) to UP
+                                case 4: { direction = BlockFacing.EAST; break; }   //Up (+y) to EAST
+                                case 5: { direction = BlockFacing.WEST; break; }   //Down (-y) to WEST                                
+                            }
+                        }
+                        if (exposingConfirm == true) {
+                            if (Harmony.DEBUG == true) Console.WriteLine("Exposed Wall found at Pos: ["+bpos+"]. \n ==Breaking the current bpos foreach==");
+                            break; 
+                        }
+                    }
+                    #endregion
 
                     #region If the block IS air, but doesn't exist within the map's bounding box, then add to the nonCoolingWallCount.
                     if (!___blockAccessor.IsValidPos(npos)) {
                         nonCoolingWallCount++;
+                        //if (Harmony.DEBUG == true) Console.WriteLine("Invalid nPOS: Continue");
                         continue;
                     }
                     #endregion
@@ -929,65 +412,10 @@ namespace hazroomrenovation.source.HarmonyPatches {
                         if (heatRetention < 0) { coolingWallCount -= heatRetention; enclosingBlocks++; }
                         else { nonCoolingWallCount += heatRetention; enclosingBlocks++; }
 
+                        //if (Harmony.DEBUG == true) Console.WriteLine("solid wall: continue");
                         continue; //jump back to the top of the for loop.
-                    } // Since this is a wall, the block types 'stairs'/'fence'/'chisel'/'slab' are important because the wall might not be heatRetaining, but it is still a 'wall' of sorts.
-                    else if (((nBlock is BlockStairs) || (nBlock is BlockFence) || (nBlock is BlockSlab) || (nBlock is BlockBaseDoor)) && heatRetention == 0) {
-                        nonCoolingWallCount++;
-                        if (___currentVisited[visitedIndex] != iteration || ___currentVisited[visitedIndex] > 0) {
-                            //I need to figure out why the index appears to be filled out before the blocks are actu... oh wait, i bet they get added when initially checked.
-                            // if we have not already visited this exposing block, use it to perform an exposing wall check.
-                            // if we HAVE visited this block already, then skip the search and proceed as normal.
-                            BlockFacing direction = BlockFacing.SOUTH;
-                            switch (facing.Index) {
-                                case 0: // North (-Z)
-                                    direction = BlockFacing.EAST;
-                                    break;
-                                case 1: // East (+X)
-                                    direction = BlockFacing.SOUTH;
-                                    break;
-                                case 2: // South (+Z)
-                                    direction = BlockFacing.WEST;
-                                    break;
-                                case 3: // West (-X)
-                                    direction = BlockFacing.NORTH;
-                                    break;
-                                case 4: // Up (+Y)
-                                    direction = BlockFacing.UP;
-                                    break;
-                                case 5: // Down (-Y)
-                                    direction = BlockFacing.DOWN;
-                                    break;
-                            }
-
-                            int exposingValue = ExposingSearch(minx, miny, minz, maxx, maxy, maxz, pos, npos, direction, iteration, ___currentVisited, ___blockAccessor, out BlockPos startPos);
-
-                            if (exposingValue == -404) {
-                                //invalid block location
-                                nonCoolingWallCount++;
-                                continue;
-                            }
-                            else if (exposingValue < 0) {
-                                //exit found during search
-                                exitCount++;
-                                continue;
-                            }
-                            else if (exposingValue > 0) {
-                                //an exposing wall was located.
-                                int exitValue = ExitSearch(minx, miny, minz, maxx, maxy, maxz, exposingValue, pos, startPos, facing, direction, iteration, ___currentVisited, ___blockAccessor, out int exposedConfirm);
-                                //an exit was found.
-                                if (exitValue > 0) { exposingBlocks += exposedConfirm; }
-                                //internal block was found.
-                                else if (exitValue == -1) { exposingValue = 0; }
-                                //no space found beyond exposing blocks. Or, an Invalid POS was found during the wall search.
-                                else if (exitValue == -2 || exitValue == -3) { nonCoolingWallCount += exposedConfirm; }
-                                //no exit found, but the otherside is mostly enclosed.
-                                else { ventilatedBlocks += exposedConfirm; }
-                            }
-                            continue;
-                        }                   
-                    }
-                    #endregion
-
+                    } 
+                    #endregion                    
                     #endregion
 
                     #region Compute the new dx, dy, dz offsets for npos
@@ -1023,20 +451,28 @@ namespace hazroomrenovation.source.HarmonyPatches {
                     }
                     if (outsideCube) { //if the above switch determins that the block is outside the allowed roomsize, add to the exitcount and jump back up to the top of the search loop.
                         exitCount++;
+                        //if (Harmony.DEBUG == true) Console.WriteLine("exit found: Continue");
                         continue;
                     }
                     #endregion
 
                     #region add the current XYZ pos data into the currentVisited array. If the current POS has already been visited, then move back to the top of the for loop.
                     visitedIndex = (dx * ARRAYSIZE + dy) * ARRAYSIZE + dz;
-                    if (Math.Abs(___currentVisited[visitedIndex]) == iteration) continue;   // continue if block position was already visited
+                    //if (Harmony.DEBUG == true) Console.WriteLine("visitedIndex: " + visitedIndex);
+                    if (___currentVisited[visitedIndex] == iteration) {
+                        // continue if block position was already visited.
+                        //if (Harmony.DEBUG == true) Console.WriteLine("Already Visited Block: Continue");
+                        continue; 
+                    }
+                    //if (Harmony.DEBUG == true) Console.WriteLine("Adding ["+ nBlock +"] at position ["+npos+"] to visited Index ["+visitedIndex+"] for iteration ["+iteration+"]");
                     ___currentVisited[visitedIndex] = iteration; // If the block position has not been visited, add it to the currentVisited array, using the current iteration as the index value for the array.
                     #endregion
 
                     #region If the block is a new block, check that it qualifies for any relavent qualities. [Potentially modded checks entered here]
                     // We only need to check the skylight if it's a block position not already visited ...
-                    int skyLightIndex = dx * ARRAYSIZE + dz;
-                    if (___skyLightXZChecked[skyLightIndex] < iteration) {
+                    int skyLightIndex = dx * ARRAYSIZE + dz; //the compressed X and Z position values of the skyLight collumn.
+                    if (___skyLightXZChecked[skyLightIndex] < iteration)
+                    {
                         ___skyLightXZChecked[skyLightIndex] = iteration;
                         int light = ___blockAccessor.GetLightLevel(npos, EnumLightLevelType.OnlySunLight);
 
@@ -1068,7 +504,7 @@ namespace hazroomrenovation.source.HarmonyPatches {
                 for (dy = 0; dy < sizey; dy++) {
                     visitedIndex = ((dx + minx) * ARRAYSIZE + (dy + miny)) * ARRAYSIZE + minz;
                     for (dz = 0; dz < sizez; dz++) {
-                        if (Math.Abs(___currentVisited[visitedIndex]) == iteration) {
+                        if (___currentVisited[visitedIndex] == iteration) {
                             int index = (dy * sizez + dz) * sizex + dx;
 
                             posInRoom[index / 8] = (byte)(posInRoom[index / 8] | (1 << (index % 8)));
