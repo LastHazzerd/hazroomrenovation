@@ -7,10 +7,18 @@ using Vintagestory.Client.NoObf;
 
 namespace hazroomrenovation.source {
     public class HazRoomRenovationModSystem : ModSystem {
+
+        public static readonly string modid = "hazroomrenovation";
+        public static AssetCategory? roomtypes = null;
+        
         /// <summary>
         /// An instance of the harmony patcher.
         /// </summary>
         private Harmony? patcher;
+
+        public override void StartPre(ICoreAPI api) {
+            roomtypes = new AssetCategory(nameof(roomtypes), true, EnumAppSide.Server);
+        }
 
         // Called on server and client
         // Useful for registering block/entity classes on both sides
@@ -42,7 +50,6 @@ namespace hazroomrenovation.source {
         /// This function is called when our mod is unloaded - Either when the game closes or a world is exited.
         /// </summary>
         public override void Dispose() {
-            //It's important to remove our patches when disposed, otherwise any worlds loaded after closing would still contain the patches even if the mod was disabled.
             patcher?.UnpatchAll(Mod.Info.ModID);
             base.Dispose();
         }

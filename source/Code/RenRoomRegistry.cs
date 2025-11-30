@@ -16,7 +16,7 @@ using static OpenTK.Graphics.OpenGL.GL;
 #nullable disable
 
 // This is a 'copy' of the vanilla RoomRegistry.cs file. I am intending to expand upon the functionality of it by inheriting the original functions, and patching every reference in the vanilla code to use these instead.
-namespace hazroomrenovation.source.Systems {
+namespace hazroomrenovation.source.Code {
     /// <summary> RenRoom (Renovated Room) - inherits the Room class from vanilla and allows for more data to be checked and more behaviors/effects to be provided. 
     /// </summary>
     public class RenRoom : Room {

@@ -1,5 +1,5 @@
 ﻿using HarmonyLib;
-using hazroomrenovation.source.Systems;
+using hazroomrenovation.source.Code;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -87,8 +87,6 @@ namespace hazroomrenovation.source.HarmonyPatches {
             int visitedIndex;
             bool foundExit = false;
             
-            if (Harmony.DEBUG == true) Console.WriteLine("++Beginning Exit Search++");
-
             #region Linear searches extending from the 'returnPos' in all 5 directions not pointed towards the room.
             BlockFacing searchDirection = forwardFace;
             foreach (BlockFacing facing in BlockFacing.ALLFACES) {
@@ -118,7 +116,6 @@ namespace hazroomrenovation.source.HarmonyPatches {
                             case 5: { foundExit = dy < 0 || maxy - miny + 1 >= MAXROOMSIZE; break; } //Down -y
                         }
                         if (foundExit == true) {
-                            if (Harmony.DEBUG == true) Console.WriteLine("Exit Found: Exposing Block");
                             return 1;
                         }
 
@@ -128,7 +125,6 @@ namespace hazroomrenovation.source.HarmonyPatches {
                         if (currentVisited[visitedIndex] == iteration) {
                             //if we find an open air block that's already marked as visited; We will assume we're still inside the room and this isn't an exposing wall.
                             if (nBlock.Id == 0) {
-                                if (Harmony.DEBUG == true) Console.WriteLine("Already visited block. ["+nBlock+" at position: "+npos+"] Internal Block");
                                 return -1; 
                             }
                             //previously visited exposing walls will be treated as solid walls. (To avoid re-entering the room if it's horseshoe or donut shaped.)
@@ -162,7 +158,6 @@ namespace hazroomrenovation.source.HarmonyPatches {
                 }
                 npos.Set(startPos); //return to the starting position of the search so we can iterate to the next face.
             }
-            if (Harmony.DEBUG == true) Console.WriteLine("No exits found: Ventilation Block.");
             return 0; //we found no exit or issue. The exposing blocks will be considered 'ventilation blocks'
             #endregion
         }
@@ -256,10 +251,9 @@ namespace hazroomrenovation.source.HarmonyPatches {
             BlockPos returnPos = npos; //create a backup Pos in case we need to return.
             int dx, dy, dz; // Additionally creates 3 int variables representing the 'decompressed' x|y|z integer values
             #endregion
-            if (Harmony.DEBUG == true) Console.WriteLine("== [Begining the search] ==");
+            //if (Harmony.DEBUG == true) Console.WriteLine("== [Begining the search] ==");
             #region [THE SEARCH] Use a 'Floodfill' Breadth-First-Search sequence to identify the boundries and contents of the room. This while-loop will be modified from the original code to accomodate new room types.
             while (bfsQueue.Count > 0) {
-                //if (Harmony.DEBUG == true) Console.WriteLine("= iteration: " + iteration + " =");
 
                 #region Dequeue the current xyz block POS data from 'bfsQueue' and use it to set BlockPos objects 'npos' and 'bpos'
                 int compressedPos = bfsQueue.Dequeue();
@@ -308,7 +302,6 @@ namespace hazroomrenovation.source.HarmonyPatches {
                     #region If the block IS air, but doesn't exist within the map's bounding box, then add to the nonCoolingWallCount.
                     if (!___blockAccessor.IsValidPos(npos)) {
                         nonCoolingWallCount++;
-                        //if (Harmony.DEBUG == true) Console.WriteLine("Invalid nPOS: Continue");
                         continue;
                     }
                     #endregion
@@ -325,7 +318,6 @@ namespace hazroomrenovation.source.HarmonyPatches {
                         if (heatRetention < 0) { coolingWallCount -= heatRetention; enclosingBlocks++; }
                         else { nonCoolingWallCount += heatRetention; enclosingBlocks++; }
 
-                        //if (Harmony.DEBUG == true) Console.WriteLine("solid wall: continue");
                         continue; //jump back to the top of the for loop.
                     }
                     #endregion
@@ -335,8 +327,8 @@ namespace hazroomrenovation.source.HarmonyPatches {
                     // The block types 'stairs'/'fence'/'chisel'/'slab'/'door' could act as 'windows' that simply do not insulate the room.
                     // Only windows of 1x1 will operate as exposing walls, any wider/taller and it'll be treated as vanilla does.
                     else if (((nBlock is BlockStairs) || (nBlock is BlockFence) || (nBlock is BlockSlab) || (nBlock is BlockBaseDoor)) && heatRetention == 0) {
-                        if (Harmony.DEBUG == true) Console.WriteLine("= iteration: " + iteration + " =");
-                        if (Harmony.DEBUG == true) Console.WriteLine("Exposing block found: " + nBlock + ", while searching: " + facing + ".\nIt is a " + nBlock.Class);
+                        //if (Harmony.DEBUG == true) Console.WriteLine("= iteration: " + iteration + " =");
+                        //if (Harmony.DEBUG == true) Console.WriteLine("Exposing block found: " + nBlock + ", while searching: " + facing + ".\nIt is a " + nBlock.Class);
                         BlockPos checkPos = new(Dimensions.NormalWorld);
                         checkPos.Set(npos);
                         BlockFacing direction = BlockFacing.UP;
@@ -418,7 +410,6 @@ namespace hazroomrenovation.source.HarmonyPatches {
                             }
                         }
                         if (exposingConfirm == true) {
-                            if (Harmony.DEBUG == true) Console.WriteLine("Exposed Wall found at Pos: [" + npos + "]. \n ==Continuing foreach to skip adding this block to queue==");
                             continue;
                         }
                     }
@@ -459,20 +450,16 @@ namespace hazroomrenovation.source.HarmonyPatches {
                     }
                     if (outsideCube) { //if the above switch determins that the block is outside the allowed roomsize, add to the exitcount and jump back up to the top of the search loop.
                         exitCount++;
-                        //if (Harmony.DEBUG == true) Console.WriteLine("exit found: Continue");
                         continue;
                     }
                     #endregion
 
                     #region add the current XYZ pos data into the currentVisited array. If the current POS has already been visited, then move back to the top of the for loop.
                     visitedIndex = (dx * ARRAYSIZE + dy) * ARRAYSIZE + dz;
-                    //if (Harmony.DEBUG == true) Console.WriteLine("visitedIndex: " + visitedIndex);
                     if (___currentVisited[visitedIndex] == iteration) {
                         // continue if block position was already visited.
-                        //if (Harmony.DEBUG == true) Console.WriteLine("Already Visited Block: Continue");
                         continue; 
                     }
-                    //if (Harmony.DEBUG == true) Console.WriteLine("Adding ["+ nBlock +"] at position ["+npos+"] to visited Index ["+visitedIndex+"] for iteration ["+iteration+"]");
                     ___currentVisited[visitedIndex] = iteration; // If the block position has not been visited, add it to the currentVisited array, using the current iteration as the index value for the array.
                     #endregion
 
@@ -532,7 +519,7 @@ namespace hazroomrenovation.source.HarmonyPatches {
             }
             #endregion
 
-            if (Harmony.DEBUG == true) Console.WriteLine("Enclosing blocks = " + enclosingBlocks + " | Exposing blocks = " + exposingBlocks + " | Ventelating blocks = " + ventilatedBlocks);
+            //if (Harmony.DEBUG == true) Console.WriteLine("Enclosing blocks = " + enclosingBlocks + " | Exposing blocks = " + exposingBlocks + " | Ventelating blocks = " + ventilatedBlocks);
 
             #region Return a RenRoom object with all the related data found by the method.
             RenRoom toReturn = new() {

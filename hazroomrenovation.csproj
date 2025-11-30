@@ -96,7 +96,7 @@
     <Reference Include="$(ExternalLibDir)/**/*.dll" Private="false" Condition="'$(ExternalLibDir)' != ''" />
   </ItemGroup>
   <ItemGroup>
-    <None Remove="source\Systems\RoomRegistry.cs~RF8637a84.TMP" />
+    <None Remove="source\Code\RoomRegistry.cs~RF8637a84.TMP" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="resources\assets\hazroomrenovation\config\" />
