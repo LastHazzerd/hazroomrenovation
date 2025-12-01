@@ -16,7 +16,33 @@ using static OpenTK.Graphics.OpenGL.GL;
 #nullable disable
 
 // This is a 'copy' of the vanilla RoomRegistry.cs file. I am intending to expand upon the functionality of it by inheriting the original functions, and patching every reference in the vanilla code to use these instead.
-namespace hazroomrenovation.source.Code {
+namespace hazroomrenovation.source.Code.RenRooms {
+    /// <summary>
+    /// Interface for creating instances of rooms
+    /// </summary>
+    public interface IRoomRegistryAPI : IClassRegistryAPI {
+
+        Dictionary<string, Type> RoomClassToTypeMapping { get; }
+
+        string GetRoomBehaviorClassName(Type roomBehaviorType);
+
+        /// <summary>
+        /// Creates a room instance from given room class
+        /// </summary>
+        /// <param name="roomClass"></param>
+        /// <returns></returns>
+        RenRoom CreateRoom(string roomClass);
+
+        /// <summary>
+        /// Returns the type of the registered room class or null otherwise
+        /// </summary>
+        /// <param name="roomClass"></param>
+        /// <returns></returns>
+        Type GetRoomClass(string roomClass);
+
+        
+    }
+
     /// <summary> RenRoom (Renovated Room) - inherits the Room class from vanilla and allows for more data to be checked and more behaviors/effects to be provided. 
     /// </summary>
     public class RenRoom : Room {

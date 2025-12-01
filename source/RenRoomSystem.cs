@@ -9,7 +9,7 @@ namespace hazroomrenovation.source {
     public class HazRoomRenovationModSystem : ModSystem {
 
         public static readonly string modid = "hazroomrenovation";
-        public static AssetCategory? roomtypes = null;
+        //public static AssetCategory? roomtypes = null;
         
         /// <summary>
         /// An instance of the harmony patcher.
@@ -17,7 +17,7 @@ namespace hazroomrenovation.source {
         private Harmony? patcher;
 
         public override void StartPre(ICoreAPI api) {
-            roomtypes = new AssetCategory(nameof(roomtypes), true, EnumAppSide.Server);
+            //roomtypes = new AssetCategory(nameof(roomtypes), true, EnumAppSide.Server);
         }
 
         // Called on server and client
