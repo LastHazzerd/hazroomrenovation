@@ -1,0 +1,13 @@
+{
+  "code":  "exposedroom",
+  "class": "RenRoom",
+  "tags": ["exposed", "generic"],
+  "behaviors": [
+    {"name": "Exposed"}
+  ],
+  "attributes": {
+    "roomType": "Exposed Room",
+    "maxSize": 14,
+    "maxExits": 0
+  }
+}

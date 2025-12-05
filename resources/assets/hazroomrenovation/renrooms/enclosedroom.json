@@ -1,0 +1,14 @@
+{
+  "code":  "enclosedroom",
+  "class": "RenRoom",
+  "tags": ["enclosed", "generic", "vanilla"],
+  "behaviors": [
+    {"name": "Enclosed"}
+  ],
+  "attributes": {
+    "roomType": "Enclosed Room",
+    "maxSize": 14,
+    "maxExposing": 0,
+    "maxExits": 0
+  }
+}

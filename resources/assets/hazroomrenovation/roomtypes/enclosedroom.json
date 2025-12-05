@@ -1,7 +1,0 @@
-{
-  "code":  "enclosedroom",
-  "class": "RenRoom",
-  "tags": ["enclosed"],
-  "behaviors": [{}],
-  "attributes": {}
-}

@@ -546,7 +546,8 @@ namespace hazroomrenovation.source.HarmonyPatches {
                 CellarProportion = GameMath.Clamp(nonCoolingWallCount / Math.Max(1, coolingWallCount), 0f, 1f) //proportion value of the cellar's effects.
             };
             //calculated values || room effects - that can't be in the above declaration.
-            if (toReturn.IsGreenHouseRenRoom) toReturn.Roomness = 5; // if it's a greenhouse then roomness has a temperature bonus.
+            //TODO - rework the greenhouse dependant game assets so that if they're in a greenhouse, the temp they rely on is the room temp rather than a simple 'roomness' bonus.
+            if (toReturn.IsGreenHouseRenRoom) toReturn.Roomness = toReturn.RoomTemp; // if it's a greenhouse then roomness has a temperature bonus.
             else toReturn.Roomness = 0; //If not, then roomness is 0.
 
             if (toReturn.IsEnclosedRenRoom || toReturn.IsGreenHouseRenRoom) { //if the room functions as a greenhouse or standard enclosed rooms.

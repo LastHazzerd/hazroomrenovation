@@ -1,0 +1,17 @@
+{
+  "code":  "greenhouse",
+  "class": "RenRoom",
+  "tags": ["enclosed", "vanilla", "growroom", "skylights", "tempcontrol", "climatecontrol"],
+  "behaviors": [
+    {"name": "Enclosed"},
+    {"name": "ControlledTemp"},
+    {"name": "ControlledClimate"}
+  ],
+  "attributes": {
+    "roomType": "Greenhouse",
+    "maxSize": 14,
+    "maxExposing": 0,
+    "maxExits": 0,
+    "skyLights": true
+  }
+}

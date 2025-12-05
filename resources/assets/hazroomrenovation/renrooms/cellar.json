@@ -1,0 +1,18 @@
+{
+  "code":  "cellar",
+  "class": "RenRoom",
+  "tags": ["enclosed", "vanilla", "insulating", "spoilagecontrol"],
+  "behaviors": [
+    {"name": "Enclosed"}, 
+    {"name": "ControlledTemp"}, 
+    {"name": "ControlledSpoil"}
+  ],
+  "attributes": {
+    "roomType": "Cellar",
+    "maxSize": 7,
+    "altVolume": 150,
+    "maxExposing": 0,
+    "maxExits": 0,
+    "minCooling": 10
+  }
+}

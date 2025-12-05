@@ -15,37 +15,28 @@ using static OpenTK.Graphics.OpenGL.GL;
 
 #nullable disable
 
+// TODO - Add a list that holds RoomType objects.
+
 // This is a 'copy' of the vanilla RoomRegistry.cs file. I am intending to expand upon the functionality of it by inheriting the original functions, and patching every reference in the vanilla code to use these instead.
 namespace hazroomrenovation.source.Code.RenRooms {
-    /// <summary>
-    /// Interface for creating instances of rooms
-    /// </summary>
-    public interface IRoomRegistryAPI : IClassRegistryAPI {
+    public delegate void RenRoomBehaviorDelegate(RenRoomBehavior behavior, ref EnumHandling handling);
+    public class ExtraHandbookSection { public string Title = null; public string Text = null; public string[] TextParts; }
 
-        Dictionary<string, Type> RoomClassToTypeMapping { get; }
-
-        string GetRoomBehaviorClassName(Type roomBehaviorType);
-
-        /// <summary>
-        /// Creates a room instance from given room class
-        /// </summary>
-        /// <param name="roomClass"></param>
-        /// <returns></returns>
-        RenRoom CreateRoom(string roomClass);
-
-        /// <summary>
-        /// Returns the type of the registered room class or null otherwise
-        /// </summary>
-        /// <param name="roomClass"></param>
-        /// <returns></returns>
-        Type GetRoomClass(string roomClass);
-
-        
-    }
-
-    /// <summary> RenRoom (Renovated Room) - inherits the Room class from vanilla and allows for more data to be checked and more behaviors/effects to be provided. 
+    /// <summary> RenRoom (Renovated Room) - inherits the Room class from vanilla and allows for more data to be checked and more behaviors/effects to be provided. <br/>
+    /// A Room is a class object that contains several data points (variables) intended to influence the other mechanics in the game. <br/>
+    /// Room objects get 'created' when an entity triggers a 'findRoom' method.
     /// </summary>
     public class RenRoom : Room {
+
+        /// <summary>
+        /// Unique domain + code for the room. Must be globally unique for all game assets.
+        /// </summary>
+        public AssetLocation Code = null;
+
+        /// <summary>
+        /// Modifiers that can alter the behvaior of the room, mostly affects values of other mechanics.
+        /// </summary>
+        public RenRoomBehavior[] RoomBehaviors = Array.Empty<RenRoomBehavior>();
 
         #region Vanilla variables
         ///// <summary> The number of times the search traversed outside the maxSize bounding box. </summary>
@@ -80,7 +71,7 @@ namespace hazroomrenovation.source.Code.RenRooms {
         /// <summary> numerical value representing the Y Position value of the rooms' lowest block. </summary>
         public int RoomWorldHeight;
         /// <summary> numerical value representing the level of heat retention a room has. </summary>
-        public int Insulation;
+        public int Insulation = 1;
         /// <summary> a numerical value that takes into consideration current world temp and heat/cold sources present. </summary>
         public int RoomTemp;
         /// <summary> the number of blockentities that can be considered 'heat sources' in the room. (firepits, heaters, etc.) </summary>
@@ -116,6 +107,7 @@ namespace hazroomrenovation.source.Code.RenRooms {
         //public string RoomName; //TODO find a way to retain some data for room locations. perhaps saving the position of a single door and considering it the 'main entrance' to a room per player's interaction.
         #endregion
 
+        #region FullyLoaded & Contains checks
         /// <summary> boolean check to verify if the room in question is fully loaded or if any number of chunks it is built on are currently unloaded. </summary>
         /// <param name="roomsList"></param>
         //public bool IsFullyLoaded(ChunkRenRooms roomsList) {
@@ -143,6 +135,32 @@ namespace hazroomrenovation.source.Code.RenRooms {
 
         //    return (PosInRoom[index / 8] & 1 << index % 8) > 0;
         //}
+        #endregion
+
+        public RenRoomBehavior GetBehavior(RenRoomBehavior[] fromList, Type type, bool withInheritance) {
+            if (withInheritance) {
+                for (int i = 0; i < fromList.Length; i++) {
+                    Type testType = fromList[i].GetType();
+                    if (testType == type || type.IsAssignableFrom(testType)) {
+                        return fromList[i];
+                    }
+                }
+                return null;
+            }
+
+            // simpler loop if withInheritance is false
+            for (int i = 0; i < fromList.Length; i++) {
+                if (fromList[i].GetType() == type) {
+                    return fromList[i];
+                }
+            }
+            return null;
+        }
+
+        public bool HasBehavior(Type type, bool withInheritance) {
+            return GetBehavior(RoomBehaviors, type, withInheritance) != null;
+        }
+
 
     }
 }
